@@ -1,0 +1,6 @@
+@DataWeb_HostAddress = http://localhost:5267
+
+GET {{DataWeb_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
