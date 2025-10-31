@@ -24,15 +24,11 @@ public class DataJudClient : IDataJudClient
             return Array.Empty<string>();
 
         var client = _http.CreateClient();
-
-        // Diagnóstico: confirme binding da ApiKey
         var keyLen = _opt.Value.ApiKey?.Trim().Length ?? 0;
         _log.LogInformation("Usando ApiKey (len): {Len} para estado {Estado}", keyLen, estado);
-
         var respostas = new ConcurrentBag<string>();
         var sem = new SemaphoreSlim(Math.Max(1, paralelismo));
         var tasks = new List<Task>();
-
         foreach (var cnj in cnjs)
         {
             await sem.WaitAsync(ct);
@@ -62,7 +58,6 @@ public class DataJudClient : IDataJudClient
                         })
                     };
 
-                    // Defina os headers por requisição para evitar interferências
                     var apiKey = _opt.Value.ApiKey?.Trim();
                     req.Headers.Accept.Clear();
                     req.Headers.Accept.ParseAdd("application/json");

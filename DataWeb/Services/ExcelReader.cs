@@ -4,7 +4,6 @@ namespace DataWeb.Services;
 
 public class ExcelReader : IExcelReader
 {
-    // linhaInicial = 2 para pular o cabeçalho
     public List<string> LerCnjs(Stream xlsxStream, int coluna = 1, int linhaInicial = 2)
     {
         var cnjs = new List<string>();

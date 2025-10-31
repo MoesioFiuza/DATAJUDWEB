@@ -29,5 +29,6 @@ public static class CnjMaps
         ["8.24"] = "Santa Catarina",
         ["8.26"] = "São Paulo",
         ["8.27"] = "Tocantins"
+
     };
 }
