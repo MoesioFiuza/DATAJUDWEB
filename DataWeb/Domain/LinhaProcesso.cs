@@ -53,7 +53,7 @@ public class LinhaProcesso
             Orgao_Codigo = src.TryGetProperty("orgaoJulgador", out var o1) ? GetNum(o1, "codigo") : "",
             Orgao_Nome = src.TryGetProperty("orgaoJulgador", out var o2) ? GetStr(o2, "nome") : "",
             Orgao_Municipio_IBGE = src.TryGetProperty("orgaoJulgador", out var o3) ? GetNum(o3, "codigoMunicipioIBGE") : "",
-            Assuntos = ExtrairAssuntos(src)
+            Assuntos = string.Join("; ", ExtrairAssuntos(src))
         };
         return l;
     }
@@ -78,17 +78,43 @@ public class LinhaProcesso
         OrdemMovimentacao = ordem;
     }
 
-    private static string ExtrairAssuntos(JsonElement src)
+    public static List<string> ExtrairAssuntos(JsonElement src)
     {
-        if (!src.TryGetProperty("assuntos", out var arr) || arr.ValueKind != JsonValueKind.Array) return "";
-        var itens = new List<string>();
-        foreach (var a in arr.EnumerateArray())
+        var assuntos = new List<string>();
+        
+        try
         {
-            var cod = a.TryGetProperty("codigo", out var c) && c.ValueKind == JsonValueKind.Number ? c.ToString() : (a.TryGetProperty("codigo", out var c2) ? c2.GetString() ?? "" : "");
-            var nome = a.TryGetProperty("nome", out var n) ? (n.GetString() ?? "") : "";
-            itens.Add($"{cod} - {nome}");
+            // Verifica se existe a propriedade 'assuntos'
+            if (src.TryGetProperty("assuntos", out JsonElement assuntosElement))
+            {
+                // Se for um array
+                if (assuntosElement.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var assunto in assuntosElement.EnumerateArray())
+                    {
+                        if (assunto.TryGetProperty("nome", out JsonElement nomeElement))
+                        {
+                            assuntos.Add(nomeElement.GetString() ?? "");
+                        }
+                    }
+                }
+                // Se for um objeto
+                else if (assuntosElement.ValueKind == JsonValueKind.Object)
+                {
+                    if (assuntosElement.TryGetProperty("nome", out JsonElement nomeElement))
+                    {
+                        assuntos.Add(nomeElement.GetString() ?? "");
+                    }
+                }
+            }
         }
-        return string.Join("; ", itens);
+        catch (Exception)
+        {
+            // Em caso de erro, retorna lista vazia
+            return new List<string>();
+        }
+        
+        return assuntos;
     }
 
     private static string ExtrairComplementos(JsonElement mov)
