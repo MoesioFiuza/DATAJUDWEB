@@ -17,9 +17,7 @@ public class JobService : IJobService
     {
         _logger = logger;
         _diretorioResultados = Path.Combine(env.ContentRootPath, "temp", "resultados");
-        Directory.CreateDirectory(_diretorioResultados);
-        
-        // Limpar jobs antigos a cada hora
+        Directory.CreateDirectory(_diretorioResultados);        
         _ = Task.Run(async () =>
         {
             while (true)

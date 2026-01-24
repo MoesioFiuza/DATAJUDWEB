@@ -45,9 +45,7 @@ public class ProcessamentoBackgroundService : BackgroundService
     private async Task ProcessarProximoJobAsync(CancellationToken ct)
     {
         using var scope = _serviceProvider.CreateScope();
-        var jobService = scope.ServiceProvider.GetRequiredService<IJobService>();
-        
-        // Buscar próximo job pendente (todos os jobs, não apenas de um usuário)
+        var jobService = scope.ServiceProvider.GetRequiredService<IJobService>();        
         var jobs = await jobService.ListarJobsPorUsuarioAsync(null);
         var jobPendente = jobs.FirstOrDefault(j => j.Status == JobStatus.Pendente);
         
