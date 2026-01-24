@@ -75,3 +75,10 @@ desktop.ini
 [Tt]est[Rr]esult*/
 [Bb]uild[Ll]og.*
 *.trx
+
+# Build results
+[Bb]in/
+[Oo]bj/
+**/publish/
+**/Release/
+**/Debug/
