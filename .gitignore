@@ -82,3 +82,6 @@ desktop.ini
 **/publish/
 **/Release/
 **/Debug/
+
+# Arquivo é gerado após build no WSL, irrelevante para o projeto, util apenas no ambiente que é buildado
+packages-microsoft-prod.deb
