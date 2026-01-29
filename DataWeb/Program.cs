@@ -13,7 +13,11 @@ var port = builder.Configuration["Kestrel:Endpoints:Http:Url"]
     ?? "http://localhost:5267";
 builder.WebHost.UseUrls(port);
 
-builder.Services.AddOpenApi();
+// A aplicação passou a usar swagger
+// builder.Services.AddOpenApi();
+
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 builder.Services.Configure<DataJudOptions>(builder.Configuration.GetSection("DataJud"));
 builder.Services.AddHttpClient();
 
@@ -38,11 +42,25 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// A configuração abaixo garante que o Swagger só seja habilitado em ambiente de desenvolvimento
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+
+    app.MapScalarApiReference(
+        endpointPrefix: "/scalar", 
+        options =>
+    {
+       options.Title = "DataWeb API";
+       options.OpenApiRoutePattern = "/swagger/{documentName}/swagger.json";
+    });
+}
+
 app.UseCors();
 app.UseStaticFiles();
 
-app.MapOpenApi();
-app.MapScalarApiReference(o => { o.Title = "DataWeb API"; });
+// app.MapOpenApi();
+// app.MapScalarApiReference(o => { o.Title = "DataWeb API"; });
 
 app.MapGet("/health", () => Results.Ok(new { 
     status = "healthy", 
@@ -256,7 +274,15 @@ app.MapPost("/upload-xlsx-excel", async (
 .WithSummary("Upload síncrono (legado)")
 .DisableAntiforgery();
 
-app.MapGet("/", () => Results.Redirect("/scalar"));
+// Redirecionamento inteligente baseado no ambiente:
+// - Em desenvolvimento, direciona para a documentação da API (Scalar)
+// - Em produção, direciona para o endpoint de health check
+app.MapGet("/", (IWebHostEnvironment env) =>
+{
+   if(env.IsDevelopment()) return Results.Redirect("/scalar");
+
+   return Results.Redirect("/health");
+});
 
 if (app.Environment.IsDevelopment())
 {
