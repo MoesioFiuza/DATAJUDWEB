@@ -6,7 +6,12 @@ services:
       dockerfile: infra/Dockerfile
     ports:
       - "5267:5267"
+    env_file:
+      - .env
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:5267
+      ConnectionStrings__DefaultConnection: "Server=${DB_SERVER};Port=${DB_PORT};Database=${DB_NAME};User=${DB_USER};Password=${DB_PASSWORD};"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
