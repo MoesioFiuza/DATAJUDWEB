@@ -3,8 +3,8 @@ using DataWeb.Services;
 using DataWeb.Exporters;
 using DataWeb.Parsers;
 using DataWeb.Domain;
-using Microsoft.AspNetCore.Http;
 using Scalar.AspNetCore;
+using DataWeb.Infrastructure.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,9 +12,6 @@ var port = builder.Configuration["Kestrel:Endpoints:Http:Url"]
     ?? builder.Configuration["ASPNETCORE_URLS"] 
     ?? "http://localhost:5267";
 builder.WebHost.UseUrls(port);
-
-// A aplicação passou a usar swagger
-// builder.Services.AddOpenApi();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -27,7 +24,7 @@ builder.Services.AddSingleton<IDatajudParser, DatajudParser>();
 builder.Services.AddSingleton<IExcelExporter, ExcelExporter>();
 builder.Services.AddSingleton<IConsultaUseCase, ConsultaUseCase>();
 
-builder.Services.AddSingleton<IJobService, JobService>();
+builder.Services.AddScoped<IJobService, JobServiceDb>();
 builder.Services.AddHostedService<ProcessamentoBackgroundService>();
 
 builder.Services.AddCors(options =>
@@ -40,7 +37,11 @@ builder.Services.AddCors(options =>
     });
 });
 
+builder.Services.AddDataWebInfrastructure(builder.Configuration);
+
 var app = builder.Build();
+
+app.ApplyDataWebMigrations();
 
 // A configuração abaixo garante que o Swagger só seja habilitado em ambiente de desenvolvimento
 if (app.Environment.IsDevelopment())
@@ -58,9 +59,6 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors();
 app.UseStaticFiles();
-
-// app.MapOpenApi();
-// app.MapScalarApiReference(o => { o.Title = "DataWeb API"; });
 
 app.MapGet("/health", () => Results.Ok(new { 
     status = "healthy", 
