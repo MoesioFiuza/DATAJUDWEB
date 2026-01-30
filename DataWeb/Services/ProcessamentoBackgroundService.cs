@@ -32,7 +32,8 @@ public class ProcessamentoBackgroundService : BackgroundService
             try
             {
                 await ProcessarProximoJobAsync(stoppingToken);
-                await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
+                // ALTERADO: Aumentado de 1 para 5 segundos para reduzir queries no banco
+                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
             }
             catch (Exception ex)
             {
