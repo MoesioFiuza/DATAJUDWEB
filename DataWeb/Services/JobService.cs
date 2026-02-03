@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using DataWeb.Domain;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
@@ -9,15 +9,18 @@ namespace DataWeb.Services;
 public class JobService : IJobService
 {
     private readonly ConcurrentDictionary<string, ProcessamentoJob> _jobs = new();
-    private readonly ConcurrentDictionary<string, byte[]> _arquivosTemporarios = new();
+    private readonly ConcurrentDictionary<string, string> _arquivosTemporarios = new();
     private readonly string _diretorioResultados;
+    private readonly string _diretorioUploads;
     private readonly ILogger<JobService> _logger;
 
     public JobService(ILogger<JobService> logger, IWebHostEnvironment env)
     {
         _logger = logger;
         _diretorioResultados = Path.Combine(env.ContentRootPath, "temp", "resultados");
+        _diretorioUploads = Path.Combine(env.ContentRootPath, "temp", "uploads");
         Directory.CreateDirectory(_diretorioResultados);        
+        Directory.CreateDirectory(_diretorioUploads);
         _ = Task.Run(async () =>
         {
             while (true)
@@ -38,10 +41,13 @@ public class JobService : IJobService
             Status = JobStatus.Pendente
         };
 
-        // Salvar arquivo temporariamente em memória (ou disco se muito grande)
-        using var ms = new MemoryStream();
-        await arquivoStream.CopyToAsync(ms);
-        _arquivosTemporarios[job.Id] = ms.ToArray();
+        var caminhoUpload = Path.Combine(_diretorioUploads, $"{job.Id}.xlsx");
+        await using (var fs = new FileStream(caminhoUpload, FileMode.Create, FileAccess.Write, FileShare.None))
+        {
+            await arquivoStream.CopyToAsync(fs);
+        }
+        job.CaminhoArquivoTemp = caminhoUpload;
+        _arquivosTemporarios[job.Id] = caminhoUpload;
 
         _jobs[job.Id] = job;
         _logger.LogInformation("Job criado: {JobId} para usuário {UsuarioId}", job.Id, usuarioId);
@@ -112,7 +118,7 @@ public class JobService : IJobService
     }
 
     // Método público para o BackgroundService acessar
-    public byte[]? ObterArquivoTemporario(string jobId)
+    public string? ObterArquivoTemporario(string jobId)
     {
         _arquivosTemporarios.TryGetValue(jobId, out var arquivo);
         return arquivo;
@@ -120,7 +126,10 @@ public class JobService : IJobService
 
     public void RemoverArquivoTemporario(string jobId)
     {
-        _arquivosTemporarios.TryRemove(jobId, out _);
+        if (_arquivosTemporarios.TryRemove(jobId, out var caminho) && File.Exists(caminho))
+        {
+            try { File.Delete(caminho); } catch { }
+        }
     }
 
     private void LimparJobsAntigos(TimeSpan idade)
@@ -141,7 +150,10 @@ public class JobService : IJobService
                     try { File.Delete(job.CaminhoResultado); } catch { }
                 }
             }
-            _arquivosTemporarios.TryRemove(id, out _);
+            if (_arquivosTemporarios.TryRemove(id, out var caminho) && File.Exists(caminho))
+            {
+                try { File.Delete(caminho); } catch { }
+            }
         }
 
         _logger.LogInformation("Limpeza: {Count} jobs antigos removidos", paraRemover.Count);

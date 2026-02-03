@@ -1,4 +1,4 @@
-using DataWeb.Domain;
+﻿using DataWeb.Domain;
 using DataWeb.Exporters;
 using DataWeb.Parsers;
 using Microsoft.Extensions.Hosting;
@@ -83,14 +83,14 @@ public class ProcessamentoBackgroundService : BackgroundService
             var exporter = scope.ServiceProvider.GetRequiredService<IExcelExporter>();
 
             // Obter arquivo temporário
-            var arquivoBytes = jobService.ObterArquivoTemporario(jobId);
-            if (arquivoBytes == null)
+            var caminhoArquivo = jobService.ObterArquivoTemporario(jobId);
+            if (string.IsNullOrWhiteSpace(caminhoArquivo) || !File.Exists(caminhoArquivo))
             {
                 await jobService.MarcarJobComoErroAsync(jobId, "Arquivo não encontrado");
                 return;
             }
 
-            using var stream = new MemoryStream(arquivoBytes);
+            await using var stream = new FileStream(caminhoArquivo, FileMode.Open, FileAccess.Read, FileShare.Read);
             
             // Processar
             var respostasJson = await consultaUseCase.ConsultarJsonAsync(stream, paralelismo: 20, ct);

@@ -67,6 +67,14 @@ public class DataJudClient : IDataJudClient
                     using var resp = await client.SendAsync(req, ct);
                     var content = await resp.Content.ReadAsStringAsync(ct);
 
+                    if (!resp.IsSuccessStatusCode)
+                    {
+                        _log.LogWarning(
+                            "Falha DataJud. Estado {Estado} CNJ {CNJ} -> {Status}. Body: {Body}",
+                            estado, cnj, (int)resp.StatusCode, content);
+                        return;
+                    }
+
                     _log.LogInformation("Estado {Estado} CNJ {CNJ} -> {Status}", estado, cnj, (int)resp.StatusCode);
                     respostas.Add(content);
                 }

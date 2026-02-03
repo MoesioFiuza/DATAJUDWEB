@@ -71,6 +71,9 @@ desktop.ini
 *.temp
 *~
 
+# Env files
+.env
+
 # Test results
 [Tt]est[Rr]esult*/
 [Bb]uild[Ll]og.*

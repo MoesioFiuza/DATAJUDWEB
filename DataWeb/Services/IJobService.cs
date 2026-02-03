@@ -12,6 +12,6 @@ public interface IJobService
     Task<bool> MarcarJobComoErroAsync(string jobId, string erro);
     Task AtualizarProgressoAsync(string jobId, int processados, int total);
     
-    byte[]? ObterArquivoTemporario(string jobId);
+    string? ObterArquivoTemporario(string jobId);
     void RemoverArquivoTemporario(string jobId);
 }

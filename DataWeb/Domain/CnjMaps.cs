@@ -1,4 +1,4 @@
-namespace DataWeb.Domain;
+﻿namespace DataWeb.Domain;
 
 public static class CnjMaps
 {

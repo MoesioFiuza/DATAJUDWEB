@@ -1,4 +1,4 @@
-const $ = (s) => document.querySelector(s);
+﻿const $ = (s) => document.querySelector(s);
 
 function setProgress(el, pct){
   if(!el) return;
@@ -13,12 +13,12 @@ function toast(msg){
   setTimeout(()=> t.classList.add('hidden'), 2500);
 }
 
-async function postExcel(file, onProgress){
+async function postJob(file, onProgress){
   const form = new FormData(); form.append('file', file);
   const xhr = new XMLHttpRequest();
   return await new Promise((resolve, reject)=>{
-    xhr.open('POST','/upload-xlsx-excel', true);
-    xhr.responseType = 'blob';
+    xhr.open('POST','/api/processar', true);
+    xhr.responseType = 'json';
     xhr.upload.onprogress = e=>{
       if(e.lengthComputable && onProgress){
         onProgress(Math.round((e.loaded/e.total)*100));
@@ -37,6 +37,31 @@ async function postExcel(file, onProgress){
   });
 }
 
+async function getJob(jobId){
+  const resp = await fetch(`/api/jobs/${jobId}`, { headers: { 'Accept': 'application/json' } });
+  if(!resp.ok){
+    const text = await resp.text();
+    throw new Error(`HTTP ${resp.status}: ${text}`);
+  }
+  return await resp.json();
+}
+
+async function waitForJob(jobId, onProgress, onStatus){
+  let done = false;
+  while(!done){
+    const job = await getJob(jobId);
+    if(onStatus) onStatus(job);
+    if(typeof job.progresso === 'number' && onProgress){
+      onProgress(Math.max(1, Math.min(99, Math.round(job.progresso))));
+    }
+    if(job.status === 'concluido' || job.status === 'erro'){
+      done = true;
+      return job;
+    }
+    await new Promise(r => setTimeout(r, 1500));
+  }
+}
+
 async function generate(){
   const file = $('#file-xlsx')?.files?.[0];
   const progress = $('#progress');
@@ -49,12 +74,25 @@ async function generate(){
 
   try{
     setProgress(progress, 5);
-    const blob = await postExcel(file, p=>setProgress(progress, p));
+    if(st) st.textContent = 'Enviando arquivo...';
+    const created = await postJob(file, p=>setProgress(progress, p));
+    const jobId = created?.jobId;
+    if(!jobId) throw new Error('Resposta inválida do servidor (jobId ausente).');
+
+    if(st) st.textContent = `Processando (Job ${jobId})...`;
+    const job = await waitForJob(jobId, p=>setProgress(progress, p), j=>{
+      if(st && j?.status) st.textContent = `Status: ${j.status}`;
+    });
+
     setProgress(progress, 100);
 
-    const url = URL.createObjectURL(blob);
-    if(dl){ dl.href = url; dl.classList.remove('hidden'); }
-    if(st) st.textContent = 'Pronto! Seu Excel consolidado está disponível para download.';
+    if(job.status === 'concluido' && job.downloadUrl){
+      if(dl){ dl.href = job.downloadUrl; dl.classList.remove('hidden'); }
+      if(st) st.textContent = 'Pronto! Seu Excel consolidado está disponível para download.';
+    }else{
+      if(st) st.textContent = job?.erro ? `Erro: ${job.erro}` : 'Falha ao processar.';
+      toast(job?.erro || 'Falha ao processar');
+    }
   }catch(err){
     setProgress(progress, 100);
     if(st) st.textContent = '';

@@ -1,4 +1,4 @@
-namespace DataWeb.Url;
+﻿namespace DataWeb.Url;
 
 public static class UrlEndpoints
 {
@@ -30,12 +30,12 @@ public static class UrlEndpoints
         ["Santa Catarina"] = "https://api-publica.datajud.cnj.jus.br/api_publica_tjsc/_search",
         ["São Paulo"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trt2/_search",
         ["Tocantins"] = "https://api-publica.datajud.cnj.jus.br/api_publica_tjto/_search",
-        ["Trabalhista Rio de Janeiro"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trt1/_search",
+        ["Trabalhista Rio De Janeiro"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trt1/_search",
         ["Trabalhista São Paulo"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trt2/_search",
-        ["Trabalhista Minas Gerais"] = "	https://api-publica.datajud.cnj.jus.br/api_publica_trt3/_search",
-        ["Trabalhista Rio Grande do Sul"] = "	https://api-publica.datajud.cnj.jus.br/api_publica_trt4/_search",
+        ["Trabalhista Minas Gerais"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trt3/_search",
+        ["Trabalhista Rio Grande Do Sul"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trt4/_search",
         ["Trabalhista Bahia"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trt5/_search",
-        ["Trabalhista Pernambuco"] = "	https://api-publica.datajud.cnj.jus.br/api_publica_trt6/_search",
+        ["Trabalhista Pernambuco"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trt6/_search",
         ["Trabalhista Ceará"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trt7/_search",
         ["Trabalhista Amapá/Pará"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trt8/_search",
         ["Trabalhista Paraná"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trt9/_search",
@@ -43,16 +43,14 @@ public static class UrlEndpoints
         ["Trabalhista Amazonas / Roraima"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trt11/_search",
         ["Trabalhista Santa Catarina"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trt12/_search",
         ["Trabalhista Paraíba"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trt13/_search",
-        ["Trabalhista Acre / Rondônia"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trt14/_search",
+        ["Trabalhista Acre/Rondônia"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trt14/_search",
         ["Trabalhista Maranhão"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trt16/_search",
         ["Trabalhista São Paulo_2"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trt15/_search",
         ["Trabalhista Espírito Santo"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trt17/_search",
         ["Trabalhista Goiás"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trt18/_search",
         ["Trabalhista Alagoas"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trt19/_search",
         ["Trabalhista Sergipe"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trt20/_search",
-        ["Trabalhista Bahia"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trt5/_search",
-        ["Trabalhista Sergipe"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trt20/_search",
-        ["Trabalhista Rio Grande do Norte"] = "	https://api-publica.datajud.cnj.jus.br/api_publica_trt21/_search",
+        ["Trabalhista Rio Grande do Norte"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trt21/_search",
         ["Trabalhista Piauí"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trt23/_search",
         ["Federal 1ª Região"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trf1/_search",
         ["Federal 2ª Região"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trf2/_search",

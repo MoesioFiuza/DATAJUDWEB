@@ -19,6 +19,7 @@ public class ProcessamentoJob
     public DateTime? IniciadoEm { get; set; }
     public DateTime? ConcluidoEm { get; set; }
     public string? CaminhoResultado { get; set; }
+    public string? CaminhoArquivoTemp { get; set; }
     public string? Erro { get; set; }
     public int TotalProcessos { get; set; }
     public int ProcessosProcessados { get; set; }
