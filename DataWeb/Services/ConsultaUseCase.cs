@@ -16,7 +16,11 @@ public class ConsultaUseCase : IConsultaUseCase
     public async Task<IReadOnlyList<string>> ConsultarJsonAsync(Stream xlsxStream, int paralelismo, CancellationToken ct)
     {
         var cnjs = _reader.LerCnjs(xlsxStream);
+        return await ConsultarPorCnjsAsync(cnjs, paralelismo, ct);
+    }
 
+    public async Task<IReadOnlyList<string>> ConsultarPorCnjsAsync(IEnumerable<string> cnjs, int paralelismo, CancellationToken ct)
+    {
         var porEstado = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         foreach (var cnj in cnjs)
         {

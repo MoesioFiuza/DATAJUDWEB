@@ -1,10 +1,12 @@
 using System.Diagnostics;
+using DataWeb.Models;
 using DataWeb.Services;
 using DataWeb.Exporters;
 using DataWeb.Parsers;
 using Scalar.AspNetCore;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,6 +18,7 @@ builder.WebHost.UseUrls(port);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.Configure<DataJudOptions>(builder.Configuration.GetSection("DataJud"));
+builder.Services.Configure<ProcessamentoOptions>(builder.Configuration.GetSection("Processamento"));
 builder.Services.AddHttpClient();
 
 builder.Services.Configure<FormOptions>(options =>
@@ -76,6 +79,55 @@ app.MapGet("/health", () => Results.Ok(new {
 }))
 .WithName("HealthCheck");
 
+app.MapPost("/api/v1/processar", async (
+    ProcessarCnjsRequest request,
+    IConsultaUseCase useCase,
+    IDatajudParser parser,
+    IExcelExporter exporter,
+    IOptions<ProcessamentoOptions> options,
+    ILogger<Program> logger,
+    CancellationToken ct) =>
+{
+    var cnjs = request.Cnjs?
+        .Where(c => !string.IsNullOrWhiteSpace(c))
+        .Select(c => c.Trim())
+        .ToList();
+
+    if (cnjs is null || cnjs.Count == 0)
+    {
+        return Results.Problem(
+            title: "Requisição inválida",
+            detail: "Informe ao menos um CNJ no campo 'cnjs'.",
+            statusCode: 400);
+    }
+
+    var maxCnjs = options.Value.MaxCnjsApi;
+    if (cnjs.Count > maxCnjs)
+    {
+        return Results.Problem(
+            title: "Limite excedido",
+            detail: $"Máximo de {maxCnjs} CNJs por requisição. Enviados: {cnjs.Count}.",
+            statusCode: 400);
+    }
+
+    var paralelismo = options.Value.Paralelismo;
+    logger.LogInformation("API v1: processando {Count} CNJs", cnjs.Count);
+
+    return await ProcessamentoExcel.ProcessarAsync(
+        useCase,
+        parser,
+        exporter,
+        logger,
+        () => useCase.ConsultarPorCnjsAsync(cnjs, paralelismo, ct),
+        ct);
+})
+.WithName("ProcessarCnjsApi")
+.WithSummary("Processa lista de CNJs (JSON) e retorna planilha Excel")
+.Produces(StatusCodes.Status200OK)
+.ProducesProblem(StatusCodes.Status400BadRequest)
+.ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+.ProducesProblem(StatusCodes.Status500InternalServerError);
+
 app.MapPost("/upload-xlsx-excel", async (
     IFormFile file, 
     IConsultaUseCase useCase, 
@@ -84,52 +136,16 @@ app.MapPost("/upload-xlsx-excel", async (
     ILogger<Program> logger, 
     CancellationToken ct) =>
 {
-    try
-    {
-        if (file is null || file.Length == 0) return Results.BadRequest("Arquivo vazio.");
-        using var stream = file.OpenReadStream();
-        var respostasJson = await useCase.ConsultarJsonAsync(stream, paralelismo: 20, ct);
-        
-        logger.LogInformation("Received {Count} JSON responses", respostasJson.Count());
-        foreach (var (index, json) in respostasJson.Select((json, i) => (i, json)).Take(3))
-        {
-            logger.LogInformation("JSON {Index}: {JsonLength} characters", index, json.Length);
-            var preview = json.Length > 300 ? json.Substring(0, 300) + "..." : json;
-            logger.LogInformation("JSON {Index} preview: {JsonPreview}", index, preview);
-        }
-        
-        var linhas = parser.ExtrairLinhas(respostasJson);
-        var excelBytes = exporter.GerarExcel(linhas);
+    if (file is null || file.Length == 0) return Results.BadRequest("Arquivo vazio.");
 
-        return Results.File(
-            excelBytes,
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "resultado.xlsx");
-    }
-    catch (System.Text.Json.JsonException ex)
-    {
-        logger.LogError(ex, "JSON parsing error");
-        return Results.Problem(
-            title: "Erro ao processar JSON",
-            detail: $"Formato JSON inválido: {ex.Message}",
-            statusCode: 400);
-    }
-    catch (InvalidOperationException ex) when (ex.Message.Contains("element of type"))
-    {
-        logger.LogError(ex, "JSON structure error at line {Line}", ex.StackTrace?.Split('\n').FirstOrDefault(l => l.Contains(":line"))?.Split(":line").LastOrDefault()?.Trim());
-        return Results.Problem(
-            title: "Erro de estrutura JSON",
-            detail: "A estrutura do JSON retornado pela API não está no formato esperado. Verifique se a API do DataJud mudou sua estrutura de resposta.",
-            statusCode: 422);
-    }
-    catch (Exception ex)
-    {
-        logger.LogError(ex, "Unexpected error during processing");
-        return Results.Problem(
-            title: "Erro interno",
-            detail: $"Erro inesperado: {ex.Message}",
-            statusCode: 500);
-    }
+    using var stream = file.OpenReadStream();
+    return await ProcessamentoExcel.ProcessarAsync(
+        useCase,
+        parser,
+        exporter,
+        logger,
+        () => useCase.ConsultarJsonAsync(stream, paralelismo: 20, ct),
+        ct);
 })
 .Accepts<IFormFile>("multipart/form-data")
 .WithName("UploadXlsxGerarExcel")
