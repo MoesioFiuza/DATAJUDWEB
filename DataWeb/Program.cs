@@ -2,9 +2,9 @@ using System.Diagnostics;
 using DataWeb.Services;
 using DataWeb.Exporters;
 using DataWeb.Parsers;
-using DataWeb.Domain;
 using Scalar.AspNetCore;
-using DataWeb.Infrastructure.Extensions;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,14 +18,16 @@ builder.Services.AddSwaggerGen();
 builder.Services.Configure<DataJudOptions>(builder.Configuration.GetSection("DataJud"));
 builder.Services.AddHttpClient();
 
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 52_428_800; // 50 MB
+});
+
 builder.Services.AddSingleton<IExcelReader, ExcelReader>();
 builder.Services.AddSingleton<IDataJudClient, DataJudClient>();
 builder.Services.AddSingleton<IDatajudParser, DatajudParser>();
 builder.Services.AddSingleton<IExcelExporter, ExcelExporter>();
 builder.Services.AddSingleton<IConsultaUseCase, ConsultaUseCase>();
-
-builder.Services.AddScoped<IJobService, JobServiceDb>();
-builder.Services.AddHostedService<ProcessamentoBackgroundService>();
 
 builder.Services.AddCors(options =>
 {
@@ -37,13 +39,8 @@ builder.Services.AddCors(options =>
     });
 });
 
-builder.Services.AddDataWebInfrastructure(builder.Configuration);
-
 var app = builder.Build();
 
-app.ApplyDataWebMigrations();
-
-// A configuração abaixo garante que o Swagger só seja habilitado em ambiente de desenvolvimento
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -56,6 +53,13 @@ if (app.Environment.IsDevelopment())
        options.OpenApiRoutePattern = "/swagger/{documentName}/swagger.json";
     });
 }
+else
+{
+    app.UseForwardedHeaders(new ForwardedHeadersOptions
+    {
+        ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+    });
+}
 
 app.UseCors();
 app.UseStaticFiles();
@@ -65,152 +69,6 @@ app.MapGet("/health", () => Results.Ok(new {
     timestamp = DateTime.UtcNow 
 }))
 .WithName("HealthCheck");
-
-app.MapPost("/api/processar", async (
-    IFormFile file,
-    HttpRequest request,
-    IJobService jobService,
-    ILogger<Program> logger,
-    CancellationToken ct) =>
-{
-    var userId = request.Headers.TryGetValue("X-User-Id", out var userIdHeader) 
-        ? userIdHeader.ToString() 
-        : null;
-
-    if (file == null || file.Length == 0)
-        return Results.BadRequest(new { error = "Arquivo vazio" });
-
-    if (!file.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) &&
-        !file.FileName.EndsWith(".xls", StringComparison.OrdinalIgnoreCase))
-        return Results.BadRequest(new { error = "Apenas arquivos Excel são aceitos" });
-
-    try
-    {
-        var jobId = await jobService.CriarJobAsync(
-            userId, 
-            file.FileName, 
-            file.Length, 
-            file.OpenReadStream());
-
-        logger.LogInformation("Arquivo recebido: {FileName} ({Size} bytes) - Job: {JobId}", 
-            file.FileName, file.Length, jobId);
-
-        return Results.Ok(new
-        {
-            jobId = jobId,
-            status = "pendente",
-            message = "Arquivo recebido e aguardando processamento",
-            createdAt = DateTime.UtcNow
-        });
-    }
-    catch (Exception ex)
-    {
-        logger.LogError(ex, "Erro ao criar job");
-        return Results.Problem(
-            title: "Erro ao processar upload",
-            detail: ex.Message,
-            statusCode: 500);
-    }
-})
-.Accepts<IFormFile>("multipart/form-data")
-.Produces(StatusCodes.Status200OK)
-.Produces(StatusCodes.Status400BadRequest)
-.Produces(StatusCodes.Status500InternalServerError)
-.WithName("ProcessarArquivo")
-.WithSummary("Envia arquivo para processamento assíncrono")
-.DisableAntiforgery();
-
-// Consultar status do job
-app.MapGet("/api/jobs/{jobId}", async (
-    string jobId,
-    IJobService jobService) =>
-{
-    var job = await jobService.ObterJobAsync(jobId);
-    if (job == null)
-        return Results.NotFound(new { error = "Job não encontrado" });
-
-    return Results.Ok(new
-    {
-        jobId = job.Id,
-        status = job.Status.ToString().ToLower(),
-        fileName = job.NomeArquivo,
-        fileSize = job.TamanhoArquivo,
-        createdAt = job.CriadoEm,
-        startedAt = job.IniciadoEm,
-        completedAt = job.ConcluidoEm,
-        totalProcessos = job.TotalProcessos,
-        processosProcessados = job.ProcessosProcessados,
-        progresso = job.TotalProcessos > 0 
-            ? (double)job.ProcessosProcessados / job.TotalProcessos * 100 
-            : 0,
-        erro = job.Erro,
-        downloadUrl = job.Status == JobStatus.Concluido 
-            ? $"/api/jobs/{jobId}/download" 
-            : null
-    });
-})
-.WithName("ConsultarStatusJob")
-.WithSummary("Consulta o status de um job de processamento");
-
-app.MapGet("/api/jobs/{jobId}/download", async (
-    string jobId,
-    IJobService jobService,
-    ILogger<Program> logger) =>
-{
-    var job = await jobService.ObterJobAsync(jobId);
-    if (job == null)
-        return Results.NotFound(new { error = "Job não encontrado" });
-
-    if (job.Status != JobStatus.Concluido || string.IsNullOrEmpty(job.CaminhoResultado))
-        return Results.BadRequest(new { error = "Job ainda não foi concluído" });
-
-    if (!File.Exists(job.CaminhoResultado))
-        return Results.NotFound(new { error = "Arquivo de resultado não encontrado" });
-
-    try
-    {
-        var bytes = await File.ReadAllBytesAsync(job.CaminhoResultado);
-        return Results.File(
-            bytes,
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            $"resultado_{job.NomeArquivo}");
-    }
-    catch (Exception ex)
-    {
-        logger.LogError(ex, "Erro ao fazer download do job {JobId}", jobId);
-        return Results.Problem(
-            title: "Erro ao fazer download",
-            detail: ex.Message,
-            statusCode: 500);
-    }
-})
-.WithName("DownloadResultado")
-.WithSummary("Faz download do resultado processado");
-
-app.MapGet("/api/jobs", async (
-    HttpRequest request,
-    IJobService jobService) =>
-{
-    var userId = request.Headers.TryGetValue("X-User-Id", out var userIdHeader) 
-        ? userIdHeader.ToString() 
-        : null;
-    
-    var jobs = await jobService.ListarJobsPorUsuarioAsync(userId);
-    return Results.Ok(jobs.Select(j => new
-    {
-        jobId = j.Id,
-        status = j.Status.ToString().ToLower(),
-        fileName = j.NomeArquivo,
-        createdAt = j.CriadoEm,
-        completedAt = j.ConcluidoEm,
-        downloadUrl = j.Status == JobStatus.Concluido 
-            ? $"/api/jobs/{j.Id}/download" 
-            : null
-    }));
-})
-.WithName("ListarJobs")
-.WithSummary("Lista todos os jobs do usuário");
-
 
 app.MapPost("/upload-xlsx-excel", async (
     IFormFile file, 
@@ -269,17 +127,14 @@ app.MapPost("/upload-xlsx-excel", async (
 })
 .Accepts<IFormFile>("multipart/form-data")
 .WithName("UploadXlsxGerarExcel")
-.WithSummary("Upload síncrono (legado)")
+.WithSummary("Upload de XLSX com CNJs e retorno da planilha consolidada")
 .DisableAntiforgery();
 
-// Redirecionamento inteligente baseado no ambiente:
-// - Em desenvolvimento, direciona para a documentação da API (Scalar)
-// - Em produção, direciona para o endpoint de health check
 app.MapGet("/", (IWebHostEnvironment env) =>
 {
-   if(env.IsDevelopment()) return Results.Redirect("/scalar");
+   if (env.IsDevelopment()) return Results.Redirect("/scalar");
 
-   return Results.Redirect("/health");
+   return Results.Redirect("/ui/index.html");
 });
 
 if (app.Environment.IsDevelopment())

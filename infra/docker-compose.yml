@@ -1,17 +1,18 @@
 services:
   dataweb-api:
-    container_name: infra-dataweb-api
+    container_name: dataweb-api
     build:
       context: ..
       dockerfile: infra/Dockerfile
     ports:
-      - "5267:5267"
-    env_file:
-      - .env
+      - "127.0.0.1:5267:5267"
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:5267
-      ConnectionStrings__DefaultConnection: "Server=${DB_SERVER};Port=${DB_PORT};Database=${DB_NAME};User=${DB_USER};Password=${DB_PASSWORD};"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5267/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
