@@ -61,6 +61,12 @@ else
     });
 }
 
+var pathBase = builder.Configuration["PathBase"];
+if (!string.IsNullOrEmpty(pathBase))
+{
+    app.UsePathBase(pathBase);
+}
+
 app.UseCors();
 app.UseStaticFiles();
 
@@ -130,11 +136,12 @@ app.MapPost("/upload-xlsx-excel", async (
 .WithSummary("Upload de XLSX com CNJs e retorno da planilha consolidada")
 .DisableAntiforgery();
 
-app.MapGet("/", (IWebHostEnvironment env) =>
+app.MapGet("/", (HttpRequest request, IWebHostEnvironment env) =>
 {
    if (env.IsDevelopment()) return Results.Redirect("/scalar");
 
-   return Results.Redirect("/ui/index.html");
+   var prefix = request.PathBase.HasValue ? request.PathBase.Value : "";
+   return Results.Redirect($"{prefix}/ui/index.html");
 });
 
 if (app.Environment.IsDevelopment())

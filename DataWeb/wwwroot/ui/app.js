@@ -17,7 +17,7 @@ async function postExcel(file, onProgress){
   const form = new FormData(); form.append('file', file);
   const xhr = new XMLHttpRequest();
   return await new Promise((resolve, reject)=>{
-    xhr.open('POST','/upload-xlsx-excel', true);
+    xhr.open('POST', '../upload-xlsx-excel', true);
     xhr.responseType = 'blob';
     xhr.upload.onprogress = e=>{
       if(e.lengthComputable && onProgress){
