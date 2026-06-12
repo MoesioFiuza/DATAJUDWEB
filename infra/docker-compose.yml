@@ -1,4 +1,22 @@
 services:
+  mysql:
+    image: mysql:8.0
+    container_name: dataweb-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
   dataweb-api:
     container_name: dataweb-api
     build:
@@ -6,14 +24,23 @@ services:
       dockerfile: infra/Dockerfile
     ports:
       - "127.0.0.1:5267:5267"
+    env_file:
+      - .env
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:5267
       PathBase: /dataweb
+      ConnectionStrings__DefaultConnection: "Server=mysql;Port=3306;Database=${DB_NAME};User=${DB_USER};Password=${DB_PASSWORD};"
+    depends_on:
+      mysql:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5267/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 15s
+      start_period: 30s
+
+volumes:
+  mysql_data:

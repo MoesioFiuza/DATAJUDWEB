@@ -50,6 +50,17 @@ public class DataJudJobConfiguration : IEntityTypeConfiguration<DataJudJob>
         builder.Property(e => e.ErrorMessage)
             .HasMaxLength(2000);
 
+        builder.Property(e => e.JobKind)
+            .HasMaxLength(20)
+            .HasDefaultValue(DataJudJobKind.Xlsx)
+            .IsRequired();
+
+        builder.Property(e => e.InputCnjsJson)
+            .HasColumnType("longtext");
+
+        builder.Property(e => e.ResultJson)
+            .HasColumnType("longtext");
+
         // Caminho do resultado
         builder.Property(e => e.ResultFilePath)
             .HasMaxLength(500);
@@ -82,6 +93,9 @@ public class DataJudJobConfiguration : IEntityTypeConfiguration<DataJudJob>
         // Índice composto UserId + CreatedAt - para listagem paginada do usuário
         builder.HasIndex(e => new { e.UserId, e.CreatedAt })
             .HasDatabaseName("IX_DataJudJobs_UserId_CreatedAt");
+
+        builder.HasIndex(e => new { e.JobKind, e.Status })
+            .HasDatabaseName("IX_DataJudJobs_JobKind_Status");
 
         // IGNORAR propriedades calculadas
         builder.Ignore(e => e.Progresso);

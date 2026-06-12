@@ -101,6 +101,15 @@ public class JobRepository : IJobRepository
             .ToListAsync();
     }
 
+    public async Task<IEnumerable<DataJudJob>> GetPendingApiJsonJobsAsync()
+    {
+        return await _context.Jobs
+            .AsNoTracking()
+            .Where(j => j.Status == DataJudJobStatus.Pendente && j.JobKind == DataJudJobKind.ApiJson)
+            .OrderBy(j => j.CreatedAt)
+            .ToListAsync();
+    }
+
     public async Task<IEnumerable<DataJudJob>> GetByStatusAsync(string status)
     {
         return await _context.Jobs

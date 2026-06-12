@@ -40,6 +40,17 @@ public class DataJudJob
     [MaxLength(2000)]
     public string? ErrorMessage { get; set; }
 
+    // Tipo do job: api-json (endpoint JSON assíncrono) ou xlsx (legado)
+    [Required]
+    [MaxLength(20)]
+    public string JobKind { get; set; } = DataJudJobKind.Xlsx;
+
+    // CNJs enviados no request JSON (serializado)
+    public string? InputCnjsJson { get; set; }
+
+    // Resultado parseado em JSON (endpoint api-json)
+    public string? ResultJson { get; set; }
+
     // Caminho do arquivo resultado no servidor (após processamento)
     [MaxLength(500)]
     public string? ResultFilePath { get; set; }
@@ -80,4 +91,10 @@ public static class DataJudJobStatus
     public const string Concluido = "concluido";
     public const string Erro = "erro";
     public const string Cancelado = "cancelado";
+}
+
+public static class DataJudJobKind
+{
+    public const string Xlsx = "xlsx";
+    public const string ApiJson = "api-json";
 }

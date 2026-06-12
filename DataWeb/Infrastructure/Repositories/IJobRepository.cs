@@ -11,6 +11,7 @@ public interface IJobRepository
     Task<IEnumerable<DataJudJob>> GetByUserIdAsync(int userId, int page = 1, int pageSize = 20);
     Task<int> CountByUserIdAsync(int userId);
     Task<IEnumerable<DataJudJob>> GetPendingJobsAsync();
+    Task<IEnumerable<DataJudJob>> GetPendingApiJsonJobsAsync();
     Task<IEnumerable<DataJudJob>> GetByStatusAsync(string status);
     Task<JobStatistics> GetUserStatisticsAsync(int userId);
 }

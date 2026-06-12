@@ -3,6 +3,8 @@ using DataWeb.Models;
 using DataWeb.Services;
 using DataWeb.Exporters;
 using DataWeb.Parsers;
+using DataWeb.Domain.Entities;
+using DataWeb.Infrastructure.Extensions;
 using Scalar.AspNetCore;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -32,6 +34,10 @@ builder.Services.AddSingleton<IDatajudParser, DatajudParser>();
 builder.Services.AddSingleton<IExcelExporter, ExcelExporter>();
 builder.Services.AddSingleton<IConsultaUseCase, ConsultaUseCase>();
 
+builder.Services.AddDataWebInfrastructure(builder.Configuration);
+builder.Services.AddScoped<IApiJsonJobService, ApiJsonJobService>();
+builder.Services.AddHostedService<ApiJsonJobBackgroundService>();
+
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
@@ -43,6 +49,8 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+app.ApplyDataWebMigrations(throwOnError: !app.Environment.IsDevelopment());
 
 if (app.Environment.IsDevelopment())
 {
@@ -111,31 +119,76 @@ app.MapPost("/api/v1/processar", async (
 
 app.MapPost("/api/v1/processar/json", async (
     ProcessarCnjsRequest request,
-    IConsultaUseCase useCase,
-    IDatajudParser parser,
+    IApiJsonJobService jobService,
     IOptions<ProcessamentoOptions> options,
-    ILogger<Program> logger,
     CancellationToken ct) =>
 {
     var (error, cnjs) = ProcessarCnjsRequestValidator.Validate(request, options.Value.MaxCnjsApi);
     if (error is not null) return error;
 
-    var paralelismo = options.Value.Paralelismo;
-    logger.LogInformation("API v1 JSON: processando {Count} CNJs", cnjs.Count);
-
-    return await ProcessamentoJson.ProcessarAsync(
-        parser,
-        logger,
-        cnjs.Count,
-        () => useCase.ConsultarPorCnjsAsync(cnjs, paralelismo, ct),
-        ct);
+    var created = await jobService.CriarJobAsync(cnjs, ct);
+    return Results.Accepted($"/api/v1/processar/json/{created.JobId}/status", created);
 })
-.WithName("ProcessarCnjsJsonApi")
-.WithSummary("Processa lista de CNJs (JSON) e retorna dados parseados em JSON")
+.WithName("CriarJobJsonApi")
+.WithSummary("Cria job assíncrono para processar CNJs e retorna jobId")
+.Produces<ApiJsonJobCreatedResponse>(StatusCodes.Status202Accepted)
+.ProducesProblem(StatusCodes.Status400BadRequest);
+
+app.MapGet("/api/v1/processar/json/{jobId}/status", async (
+    string jobId,
+    IApiJsonJobService jobService,
+    CancellationToken ct) =>
+{
+    var status = await jobService.ObterStatusAsync(jobId, ct);
+    if (status is null)
+        return Results.NotFound(new { error = "Job não encontrado" });
+
+    return Results.Ok(status);
+})
+.WithName("ConsultarStatusJobJsonApi")
+.WithSummary("Consulta status do job JSON pelo jobId")
+.Produces<ApiJsonJobStatusResponse>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status404NotFound);
+
+app.MapGet("/api/v1/processar/json/{jobId}/resultado", async (
+    string jobId,
+    IApiJsonJobService jobService,
+    CancellationToken ct) =>
+{
+    var status = await jobService.ObterStatusAsync(jobId, ct);
+    if (status is null)
+        return Results.NotFound(new { error = "Job não encontrado" });
+
+    if (status.Status == DataJudJobStatus.Erro)
+    {
+        return Results.Problem(
+            title: "Job com erro",
+            detail: status.Erro ?? "Erro desconhecido",
+            statusCode: 422);
+    }
+
+    if (status.Status != DataJudJobStatus.Concluido)
+    {
+        return Results.Conflict(new
+        {
+            error = "Job ainda não concluído",
+            status = status.Status,
+            progresso = status.Progresso
+        });
+    }
+
+    var resultado = await jobService.ObterResultadoAsync(jobId, ct);
+    if (resultado is null)
+        return Results.NotFound(new { error = "Resultado não encontrado" });
+
+    return Results.Ok(resultado);
+})
+.WithName("ObterResultadoJobJsonApi")
+.WithSummary("Obtém resultado JSON do job quando concluído")
 .Produces<ProcessarCnjsJsonResponse>(StatusCodes.Status200OK)
-.ProducesProblem(StatusCodes.Status400BadRequest)
-.ProducesProblem(StatusCodes.Status422UnprocessableEntity)
-.ProducesProblem(StatusCodes.Status500InternalServerError);
+.Produces(StatusCodes.Status404NotFound)
+.Produces(StatusCodes.Status409Conflict)
+.ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
 app.MapPost("/upload-xlsx-excel", async (
     IFormFile file, 
