@@ -86,10 +86,16 @@ public class ApiJsonJobBackgroundService : BackgroundService
                 return;
             }
 
+            var progresso = new Progress<int>(cnjsProcessados =>
+            {
+                _ = AtualizarProgressoAsync(jobId, cnjsProcessados);
+            });
+
             var respostasJson = await useCase.ConsultarPorCnjsAsync(
                 cnjs,
                 options.Value.Paralelismo,
-                ct);
+                CancellationToken.None,
+                progresso);
 
             var linhas = parser.ExtrairLinhas(respostasJson);
             var resultado = new ProcessarCnjsJsonResponse(
@@ -103,6 +109,20 @@ public class ApiJsonJobBackgroundService : BackgroundService
         {
             _logger.LogError(ex, "Erro ao processar job JSON {JobId}", jobId);
             await jobService.MarcarComoErroAsync(jobId, ex.Message, ct);
+        }
+    }
+
+    private async Task AtualizarProgressoAsync(string jobId, int cnjsProcessados)
+    {
+        try
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var jobService = scope.ServiceProvider.GetRequiredService<IApiJsonJobService>();
+            await jobService.AtualizarProgressoAsync(jobId, cnjsProcessados);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Falha ao atualizar progresso do job {JobId}", jobId);
         }
     }
 }

@@ -18,7 +18,12 @@ public class DataJudClient : IDataJudClient
         _http = http; _opt = opt; _log = log;
     }
 
-    public async Task<IReadOnlyList<string>> ConsultarPorEstadoAsync(string estado, IEnumerable<string> cnjs, int paralelismo, CancellationToken ct)
+    public async Task<IReadOnlyList<string>> ConsultarPorEstadoAsync(
+        string estado,
+        IEnumerable<string> cnjs,
+        int paralelismo,
+        CancellationToken ct,
+        Action? onCnjConsultado = null)
     {
         if (!UrlEndpoints.PorEstado.TryGetValue(estado, out var url))
             return Array.Empty<string>();
@@ -78,6 +83,7 @@ public class DataJudClient : IDataJudClient
                 finally
                 {
                     sem.Release();
+                    onCnjConsultado?.Invoke();
                 }
             }, ct));
         }

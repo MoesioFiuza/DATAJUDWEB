@@ -87,10 +87,25 @@ public class ApiJsonJobService : IApiJsonJobService
         job.CompletedAt = DateTime.UtcNow;
         job.ResultJson = JsonSerializer.Serialize(resultado, JsonOptions);
         job.TotalProcessos = resultado.TotalCnjsEnviados;
-        job.ProcessosProcessados = resultado.TotalLinhas;
+        job.ProcessosProcessados = resultado.TotalCnjsEnviados;
 
         await _repository.UpdateAsync(job);
-        _logger.LogInformation("Job JSON {JobId} concluído com {Linhas} linhas", jobId, resultado.TotalLinhas);
+        _logger.LogInformation(
+            "Job JSON {JobId} concluído: {Cnjs} CNJs, {Linhas} linhas",
+            jobId,
+            resultado.TotalCnjsEnviados,
+            resultado.TotalLinhas);
+    }
+
+    public async Task AtualizarProgressoAsync(string jobId, int cnjsProcessados, CancellationToken ct = default)
+    {
+        var job = await _repository.GetByIdAsync(jobId);
+        if (job == null || job.JobKind != DataJudJobKind.ApiJson) return;
+        if (job.Status != DataJudJobStatus.Processando) return;
+        if (cnjsProcessados <= job.ProcessosProcessados) return;
+
+        job.ProcessosProcessados = cnjsProcessados;
+        await _repository.UpdateAsync(job);
     }
 
     public async Task MarcarComoErroAsync(string jobId, string erro, CancellationToken ct = default)
@@ -115,14 +130,39 @@ public class ApiJsonJobService : IApiJsonJobService
         return JsonSerializer.Deserialize<List<string>>(job.InputCnjsJson, JsonOptions) ?? [];
     }
 
-    private static ApiJsonJobStatusResponse MapStatus(DataJudJob job)
+    private ApiJsonJobStatusResponse MapStatus(DataJudJob job)
     {
+        var totalLinhas = 0;
+        if (job.Status == DataJudJobStatus.Concluido && !string.IsNullOrWhiteSpace(job.ResultJson))
+        {
+            try
+            {
+                var resultado = JsonSerializer.Deserialize<ProcessarCnjsJsonResponse>(job.ResultJson, JsonOptions);
+                totalLinhas = resultado?.TotalLinhas ?? 0;
+            }
+            catch
+            {
+                // ignora JSON inválido no status
+            }
+        }
+
+        var progresso = job.Status switch
+        {
+            DataJudJobStatus.Concluido => 100,
+            DataJudJobStatus.Pendente => 0,
+            _ when job.TotalProcessos > 0 => Math.Min(
+                100,
+                (int)Math.Round((double)job.ProcessosProcessados / job.TotalProcessos * 100)),
+            _ => 0
+        };
+
         return new ApiJsonJobStatusResponse(
             job.Id,
             job.Status,
             job.TotalProcessos,
-            job.Status == DataJudJobStatus.Concluido ? job.ProcessosProcessados : 0,
-            job.Progresso,
+            job.ProcessosProcessados,
+            totalLinhas,
+            progresso,
             job.CreatedAt,
             job.StartedAt,
             job.CompletedAt,

@@ -19,7 +19,11 @@ public class ConsultaUseCase : IConsultaUseCase
         return await ConsultarPorCnjsAsync(cnjs, paralelismo, ct);
     }
 
-    public async Task<IReadOnlyList<string>> ConsultarPorCnjsAsync(IEnumerable<string> cnjs, int paralelismo, CancellationToken ct)
+    public async Task<IReadOnlyList<string>> ConsultarPorCnjsAsync(
+        IEnumerable<string> cnjs,
+        int paralelismo,
+        CancellationToken ct,
+        IProgress<int>? progressoCnjs = null)
     {
         var porEstado = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         foreach (var cnj in cnjs)
@@ -32,7 +36,15 @@ public class ConsultaUseCase : IConsultaUseCase
             lista.Add(cnj);
         }
 
-        var tasks = porEstado.Select(kv => _client.ConsultarPorEstadoAsync(kv.Key, kv.Value, paralelismo, ct));
+        var concluidos = 0;
+        void ReportarConclusao()
+        {
+            var atual = Interlocked.Increment(ref concluidos);
+            progressoCnjs?.Report(atual);
+        }
+
+        var tasks = porEstado.Select(kv =>
+            _client.ConsultarPorEstadoAsync(kv.Key, kv.Value, paralelismo, ct, ReportarConclusao));
         var respostasPorEstado = await Task.WhenAll(tasks);
         return respostasPorEstado.SelectMany(x => x).ToList();
     }

@@ -49,6 +49,14 @@ public static class ProcessamentoExcel
                 detail: "A estrutura do JSON retornado pela API não está no formato esperado. Verifique se a API do DataJud mudou sua estrutura de resposta.",
                 statusCode: 422);
         }
+        catch (OperationCanceledException)
+        {
+            logger.LogWarning("Processamento cancelado (timeout ou cliente desconectou). Use POST /api/v1/processar/json para lotes grandes.");
+            return Results.Problem(
+                title: "Processamento interrompido",
+                detail: "A requisição foi cancelada antes de concluir (timeout do proxy ou cliente). Para lotes grandes, use o fluxo assíncrono: POST /api/v1/processar/json.",
+                statusCode: StatusCodes.Status504GatewayTimeout);
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, "Unexpected error during processing");
