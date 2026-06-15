@@ -1,11 +1,12 @@
 using ClosedXML.Excel;
 using DataWeb.Domain;
+using DataWeb.Utils;
 
 namespace DataWeb.Exporters;
 
 public class ExcelExporter : IExcelExporter
 {
-    private static readonly string[] Cab = new[]
+    private static readonly string[] CabLegado =
     {
         "ID_Datajud","Número do Processo","Tribunal","Grau","Nível Sigilo",
         "Classe_Código","Classe_Nome","Sistema_Código","Sistema_Nome","Formato_Código","Formato_Nome",
@@ -16,17 +17,36 @@ public class ExcelExporter : IExcelExporter
         "É Mais Recente","Ordem Movimentação"
     };
 
+    private static readonly string[] CabDadosCompletosFixo =
+    {
+        "Número CNJ",
+        "Tribunal",
+        "Grau",
+        "Ramo da Justiça",
+        "Nível de Sigilo",
+        "Classe",
+        "Sistema",
+        "Formato",
+        "Órgão Julgador",
+        "Assuntos",
+        "Data Ajuizamento",
+        "Total Movimentações",
+        "ID Datajud"
+    };
+
+    private const int ColunasFixasDadosCompletos = 13;
+    private const int ColunasPorMovimentacao = 3;
+
     public byte[] GerarExcel(List<LinhaProcesso> linhas)
     {
         using var wb = new XLWorkbook();
 
         var wsDados = wb.Worksheets.Add("Dados Completos");
-        WriteHeader(wsDados, Cab);
-        WriteRows(wsDados, linhas);
+        WriteDadosCompletosWide(wsDados, linhas);
 
         var wsRecentes = wb.Worksheets.Add("Movimentações Recentes");
-        WriteHeader(wsRecentes, Cab);
-        WriteRows(wsRecentes, linhas.Where(l => l.EhMaisRecente == "Sim").ToList());
+        WriteHeader(wsRecentes, CabLegado);
+        WriteRowsLegado(wsRecentes, linhas.Where(l => l.EhMaisRecente == "Sim").ToList());
 
         var wsResumo = wb.Worksheets.Add("Resumo Processos");
         WriteResumo(wsResumo, linhas);
@@ -39,13 +59,88 @@ public class ExcelExporter : IExcelExporter
         return ms.ToArray();
     }
 
+    private static void WriteDadosCompletosWide(IXLWorksheet ws, List<LinhaProcesso> linhas)
+    {
+        var grupos = linhas
+            .GroupBy(l => l.NumeroProcesso)
+            .Select(g => new ProcessoAgrupado(g.Key, g.ToList()))
+            .OrderBy(p => p.NumeroProcesso)
+            .ToList();
+
+        var maxMovimentacoes = grupos.Count == 0
+            ? 0
+            : grupos.Max(p => p.Movimentacoes.Count);
+
+        WriteHeaderDadosCompletos(ws, maxMovimentacoes);
+
+        int row = 2;
+        foreach (var processo in grupos)
+        {
+            WriteLinhaProcessoWide(ws, row, processo, maxMovimentacoes);
+            row++;
+        }
+
+        ws.Columns().AdjustToContents();
+    }
+
+    private static void WriteHeaderDadosCompletos(IXLWorksheet ws, int maxMovimentacoes)
+    {
+        for (int i = 0; i < CabDadosCompletosFixo.Length; i++)
+            ws.Cell(1, i + 1).Value = CabDadosCompletosFixo[i];
+
+        int col = ColunasFixasDadosCompletos + 1;
+        for (int m = 1; m <= maxMovimentacoes; m++)
+        {
+            ws.Cell(1, col).Value = $"Mov {m} - Data";
+            ws.Cell(1, col + 1).Value = $"Mov {m} - Descrição";
+            ws.Cell(1, col + 2).Value = $"Mov {m} - Complementos";
+            col += ColunasPorMovimentacao;
+        }
+
+        var totalCols = ColunasFixasDadosCompletos + maxMovimentacoes * ColunasPorMovimentacao;
+        if (totalCols > 0)
+            ws.Range(1, 1, 1, totalCols).Style.Font.Bold = true;
+    }
+
+    private static void WriteLinhaProcessoWide(
+        IXLWorksheet ws,
+        int row,
+        ProcessoAgrupado processo,
+        int maxMovimentacoes)
+    {
+        var baseInfo = processo.Base;
+
+        ws.Cell(row, 1).Value = CnjFormat.FormatarComMascara(processo.NumeroProcesso);
+        ws.Cell(row, 2).Value = baseInfo.Tribunal;
+        ws.Cell(row, 3).Value = CnjFormat.ObterGrauTratado(baseInfo.Grau);
+        ws.Cell(row, 4).Value = CnjFormat.ObterRamoJustica(processo.NumeroProcesso);
+        ws.Cell(row, 5).Value = CnjFormat.ObterNivelSigiloTratado(baseInfo.NivelSigilo);
+        ws.Cell(row, 6).Value = baseInfo.CClasse_Nome;
+        ws.Cell(row, 7).Value = baseInfo.SSistema_Nome;
+        ws.Cell(row, 8).Value = baseInfo.FFormato_Nome;
+        ws.Cell(row, 9).Value = baseInfo.Orgao_Nome;
+        ws.Cell(row, 10).Value = baseInfo.Assuntos;
+        ws.Cell(row, 11).Value = baseInfo.DataAjuizamento;
+        ws.Cell(row, 12).Value = processo.Movimentacoes.Count;
+        ws.Cell(row, 13).Value = baseInfo.ID_Datajud;
+
+        int col = ColunasFixasDadosCompletos + 1;
+        foreach (var mov in processo.Movimentacoes)
+        {
+            ws.Cell(row, col).Value = mov.DataHoraMovimentacao;
+            ws.Cell(row, col + 1).Value = mov.Movimento_Nome;
+            ws.Cell(row, col + 2).Value = mov.Complementos_Tabelados;
+            col += ColunasPorMovimentacao;
+        }
+    }
+
     private static void WriteHeader(IXLWorksheet ws, string[] cab)
     {
         for (int i = 0; i < cab.Length; i++) ws.Cell(1, i + 1).Value = cab[i];
         ws.Range(1, 1, 1, cab.Length).Style.Font.Bold = true;
     }
 
-    private static void WriteRows(IXLWorksheet ws, List<LinhaProcesso> ls)
+    private static void WriteRowsLegado(IXLWorksheet ws, List<LinhaProcesso> ls)
     {
         int r = 2;
         foreach (var l in ls)
@@ -141,5 +236,25 @@ public class ExcelExporter : IExcelExporter
             r++;
         }
         ws.Columns().AdjustToContents();
+    }
+
+    private sealed class ProcessoAgrupado
+    {
+        public string NumeroProcesso { get; }
+        public LinhaProcesso Base { get; }
+        public IReadOnlyList<LinhaProcesso> Movimentacoes { get; }
+
+        public ProcessoAgrupado(string numeroProcesso, List<LinhaProcesso> linhas)
+        {
+            NumeroProcesso = numeroProcesso;
+            Base = linhas.OrderBy(l => l.OrdemMovimentacao).First();
+
+            var comMovimento = linhas
+                .Where(l => l.OrdemMovimentacao > 0)
+                .OrderBy(l => l.OrdemMovimentacao)
+                .ToList();
+
+            Movimentacoes = comMovimento.Count > 0 ? comMovimento : linhas.Take(1).ToList();
+        }
     }
 }
