@@ -28,7 +28,7 @@ public static class UrlEndpoints
         ["Rondônia"] = "https://api-publica.datajud.cnj.jus.br/api_publica_tjro/_search",
         ["Roraima"] = "https://api-publica.datajud.cnj.jus.br/api_publica_tjrr/_search",
         ["Santa Catarina"] = "https://api-publica.datajud.cnj.jus.br/api_publica_tjsc/_search",
-        ["São Paulo"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trt2/_search",
+        ["São Paulo"] = "https://api-publica.datajud.cnj.jus.br/api_publica_tjsp/_search",
         ["Tocantins"] = "https://api-publica.datajud.cnj.jus.br/api_publica_tjto/_search",
         ["Trabalhista Rio de Janeiro"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trt1/_search",
         ["Trabalhista São Paulo"] = "https://api-publica.datajud.cnj.jus.br/api_publica_trt2/_search",
