@@ -32,6 +32,7 @@ public static class AppServiceCollectionExtensions
 
         services.AddDataWebInfrastructure(configuration);
         services.AddScoped<IApiJsonJobService, ApiJsonJobService>();
+        services.AddScoped<IJobResultadoFrontService, JobResultadoFrontService>();
         services.AddHostedService<ApiJsonJobBackgroundService>();
 
         services.AddCors(options =>

@@ -25,13 +25,43 @@ public static class ProcessarJsonEndpoints
             .Produces<ApiJsonJobStatusResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 
-        group.MapGet("/{jobId}/resultado", ObterResultadoJobAsync)
-            .WithName("ObterResultadoJobJsonApi")
-            .WithSummary("Obtém resultado JSON do job quando concluído")
+        group.MapGet("/{jobId}/resultado", ObterResultadoResumoAsync)
+            .WithName("ObterResultadoResumoJobJsonApi")
+            .WithSummary("Resumo leve do resultado (contadores + links)")
+            .Produces<JobResultadoResumoResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
+        group.MapGet("/{jobId}/resultado/completo", ObterResultadoCompletoAsync)
+            .WithName("ObterResultadoCompletoJobJsonApi")
+            .WithSummary("Resultado JSON completo (legado — pode ser muito grande)")
             .Produces<ProcessarCnjsJsonResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound)
             .Produces(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
+        group.MapGet("/{jobId}/resultado/resumo", ObterResultadoResumoAsync)
+            .WithName("ObterResultadoResumoExplicitoJobJsonApi")
+            .WithSummary("Resumo leve do resultado")
+            .Produces<JobResultadoResumoResponse>(StatusCodes.Status200OK);
+
+        group.MapGet("/{jobId}/resultado/processos", ListarProcessosAsync)
+            .WithName("ListarProcessosResultadoJobJsonApi")
+            .WithSummary("Lista paginada de processos (sem movimentações)")
+            .Produces<PaginatedResponse<ProcessoListaItem>>(StatusCodes.Status200OK);
+
+        group.MapGet("/{jobId}/resultado/processos/{cnj}/movimentacoes", ListarMovimentacoesAsync)
+            .WithName("ListarMovimentacoesResultadoJobJsonApi")
+            .WithSummary("Movimentações paginadas de um processo")
+            .Produces<PaginatedResponse<MovimentacaoItem>>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapGet("/{jobId}/resultado/processos/{cnj}", ObterProcessoAsync)
+            .WithName("ObterProcessoResultadoJobJsonApi")
+            .WithSummary("Detalhe de um processo (sem movimentações)")
+            .Produces<ProcessoDetalheResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
 
         group.MapGet("/{jobId}/excel", ObterExcelJobAsync)
             .WithName("ObterExcelJobJsonApi")
@@ -67,7 +97,17 @@ public static class ProcessarJsonEndpoints
         return Results.Ok(status);
     }
 
-    private static async Task<IResult> ObterResultadoJobAsync(
+    private static async Task<IResult> ObterResultadoResumoAsync(
+        string jobId,
+        IJobResultadoFrontService frontService,
+        CancellationToken ct)
+    {
+        var (error, resumo) = await frontService.ObterResumoAsync(jobId, ct);
+        if (error is not null) return error;
+        return Results.Ok(resumo);
+    }
+
+    private static async Task<IResult> ObterResultadoCompletoAsync(
         string jobId,
         IApiJsonJobService jobService,
         CancellationToken ct)
@@ -80,6 +120,42 @@ public static class ProcessarJsonEndpoints
             return Results.NotFound(new { error = "Resultado não encontrado" });
 
         return Results.Ok(resultado);
+    }
+
+    private static async Task<IResult> ListarProcessosAsync(
+        string jobId,
+        IJobResultadoFrontService frontService,
+        int page = 1,
+        int pageSize = 25,
+        CancellationToken ct = default)
+    {
+        var (error, pagina) = await frontService.ListarProcessosAsync(jobId, page, pageSize, ct);
+        if (error is not null) return error;
+        return Results.Ok(pagina);
+    }
+
+    private static async Task<IResult> ObterProcessoAsync(
+        string jobId,
+        string cnj,
+        IJobResultadoFrontService frontService,
+        CancellationToken ct)
+    {
+        var (error, detalhe) = await frontService.ObterProcessoAsync(jobId, cnj, ct);
+        if (error is not null) return error;
+        return Results.Ok(detalhe);
+    }
+
+    private static async Task<IResult> ListarMovimentacoesAsync(
+        string jobId,
+        string cnj,
+        IJobResultadoFrontService frontService,
+        int page = 1,
+        int pageSize = 50,
+        CancellationToken ct = default)
+    {
+        var (error, pagina) = await frontService.ListarMovimentacoesAsync(jobId, cnj, page, pageSize, ct);
+        if (error is not null) return error;
+        return Results.Ok(pagina);
     }
 
     private static async Task<IResult> ObterExcelJobAsync(
