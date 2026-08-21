@@ -133,12 +133,33 @@ public class ApiJsonJobService : IApiJsonJobService
     private ApiJsonJobStatusResponse MapStatus(DataJudJob job)
     {
         var totalLinhas = 0;
+        var totalEncontrados = 0;
+        var totalNaoEncontrados = 0;
+        var totalErros = 0;
         if (job.Status == DataJudJobStatus.Concluido && !string.IsNullOrWhiteSpace(job.ResultJson))
         {
             try
             {
                 var resultado = JsonSerializer.Deserialize<ProcessarCnjsJsonResponse>(job.ResultJson, JsonOptions);
-                totalLinhas = resultado?.TotalLinhas ?? 0;
+                if (resultado is not null)
+                {
+                    totalLinhas = resultado.TotalLinhas;
+                    totalEncontrados = resultado.TotalEncontrados;
+                    totalNaoEncontrados = resultado.TotalNaoEncontrados;
+                    totalErros = resultado.TotalErros;
+
+                    if (totalEncontrados == 0 && totalNaoEncontrados == 0 && totalErros == 0
+                        && resultado.Processos.Count > 0)
+                    {
+                        var recalculo = ProcessarCnjsJsonResponse.Criar(
+                            resultado.TotalCnjsEnviados,
+                            resultado.Processos.ToList());
+                        totalLinhas = recalculo.TotalLinhas;
+                        totalEncontrados = recalculo.TotalEncontrados;
+                        totalNaoEncontrados = recalculo.TotalNaoEncontrados;
+                        totalErros = recalculo.TotalErros;
+                    }
+                }
             }
             catch
             {
@@ -166,6 +187,9 @@ public class ApiJsonJobService : IApiJsonJobService
             job.CreatedAt,
             job.StartedAt,
             job.CompletedAt,
-            job.ErrorMessage);
+            job.ErrorMessage,
+            totalEncontrados,
+            totalNaoEncontrados,
+            totalErros);
     }
 }

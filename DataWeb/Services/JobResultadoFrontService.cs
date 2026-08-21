@@ -33,12 +33,24 @@ public class JobResultadoFrontService : IJobResultadoFrontService
         var (error, agrupados, totalCnjs) = await CarregarAgrupadosAsync(jobId, ct);
         if (error is not null || agrupados is null) return (error, null);
 
-        var totalMov = agrupados.Sum(p => p.Movimentacoes.Count);
+        var encontrados = agrupados.Count(p => p.FoiEncontrado);
+        var naoEncontrados = agrupados.Count(p => p.Status == DataJudProcessoStatus.NaoEncontrado);
+        var erros = agrupados.Count - encontrados - naoEncontrados;
+        var totalMov = agrupados.Where(p => p.FoiEncontrado).Sum(p => p.Movimentacoes.Count);
+        var pendencias = agrupados
+            .Where(p => !p.FoiEncontrado)
+            .Select(p => new PendenciaCnj(p.NumeroProcessoFormatado, p.Status, p.Motivo ?? ""))
+            .ToList();
+
         return (null, new JobResultadoResumoResponse(
             jobId,
             totalCnjs,
-            agrupados.Count,
+            encontrados,
             totalMov,
+            encontrados,
+            naoEncontrados,
+            erros,
+            pendencias,
             CriarLinks(jobId)));
     }
 
@@ -67,7 +79,7 @@ public class JobResultadoFrontService : IJobResultadoFrontService
 
         var processo = JobResultadoAgrupador.BuscarPorCnj(agrupados!, cnj);
         if (processo is null)
-            return (Results.NotFound(new { error = "Processo não encontrado no resultado do job" }), null);
+            return (Results.NotFound(new { error = "CNJ não faz parte deste job" }), null);
 
         return (null, MapDetalhe(jobId, processo));
     }
@@ -81,7 +93,7 @@ public class JobResultadoFrontService : IJobResultadoFrontService
 
         var processo = JobResultadoAgrupador.BuscarPorCnj(agrupados!, cnj);
         if (processo is null)
-            return (Results.NotFound(new { error = "Processo não encontrado no resultado do job" }), null);
+            return (Results.NotFound(new { error = "CNJ não faz parte deste job" }), null);
 
         var (pagina, tamanho) = NormalizarPaginacao(page, pageSize);
         var movs = processo.Movimentacoes;
@@ -161,6 +173,8 @@ public class JobResultadoFrontService : IJobResultadoFrontService
         var b = p.Base;
         return new ProcessoListaItem(
             p.NumeroProcessoFormatado,
+            p.Status,
+            p.Motivo,
             b.Tribunal,
             CnjFormat.ObterGrauTratado(b.Grau),
             CnjFormat.ObterRamoJustica(p.NumeroProcessoDigits),
@@ -180,6 +194,8 @@ public class JobResultadoFrontService : IJobResultadoFrontService
         var cnj = Uri.EscapeDataString(p.NumeroProcessoFormatado);
         return new ProcessoDetalheResponse(
             p.NumeroProcessoFormatado,
+            p.Status,
+            p.Motivo,
             b.ID_Datajud,
             b.Tribunal,
             CnjFormat.ObterGrauTratado(b.Grau),

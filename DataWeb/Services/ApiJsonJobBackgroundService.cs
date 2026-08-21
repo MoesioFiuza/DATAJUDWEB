@@ -98,10 +98,7 @@ public class ApiJsonJobBackgroundService : BackgroundService
                 progresso);
 
             var linhas = parser.ExtrairLinhas(respostasJson);
-            var resultado = new ProcessarCnjsJsonResponse(
-                TotalCnjsEnviados: cnjs.Count,
-                TotalLinhas: linhas.Count,
-                Processos: linhas);
+            var resultado = ProcessarCnjsJsonResponse.Criar(cnjs.Count, linhas);
 
             await jobService.MarcarComoConcluidoAsync(jobId, resultado, ct);
         }

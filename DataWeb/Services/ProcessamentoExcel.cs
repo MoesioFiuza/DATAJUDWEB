@@ -1,3 +1,4 @@
+using DataWeb.Domain;
 using DataWeb.Exporters;
 using DataWeb.Parsers;
 
@@ -10,22 +11,22 @@ public static class ProcessamentoExcel
         IDatajudParser parser,
         IExcelExporter exporter,
         ILogger logger,
-        Func<Task<IReadOnlyList<string>>> obterRespostas,
+        Func<Task<IReadOnlyList<RespostaCnj>>> obterRespostas,
         CancellationToken ct)
     {
         try
         {
-            var respostasJson = await obterRespostas();
+            var respostas = await obterRespostas();
 
-            logger.LogInformation("Received {Count} JSON responses", respostasJson.Count);
-            foreach (var (index, json) in respostasJson.Select((json, i) => (i, json)).Take(3))
+            logger.LogInformation("Received {Count} CNJ responses", respostas.Count);
+            foreach (var (index, resp) in respostas.Select((r, i) => (i, r)).Take(3))
             {
-                logger.LogInformation("JSON {Index}: {JsonLength} characters", index, json.Length);
-                var preview = json.Length > 300 ? json.Substring(0, 300) + "..." : json;
-                logger.LogInformation("JSON {Index} preview: {JsonPreview}", index, preview);
+                var json = resp.Json ?? resp.Erro ?? "";
+                logger.LogInformation("CNJ {Index} ({Cnj}): {JsonLength} characters, status {Status}",
+                    index, resp.Cnj, json.Length, resp.StatusPrevio);
             }
 
-            var linhas = parser.ExtrairLinhas(respostasJson);
+            var linhas = parser.ExtrairLinhas(respostas);
             var excelBytes = exporter.GerarExcel(linhas);
 
             return Results.File(

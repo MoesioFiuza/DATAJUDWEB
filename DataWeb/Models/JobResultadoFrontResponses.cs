@@ -5,6 +5,10 @@ public record JobResultadoResumoResponse(
     int TotalCnjsEnviados,
     int TotalProcessos,
     int TotalMovimentacoes,
+    int TotalEncontrados,
+    int TotalNaoEncontrados,
+    int TotalErros,
+    IReadOnlyList<PendenciaCnj> Pendencias,
     JobResultadoLinks Links);
 
 public record JobResultadoLinks(
@@ -20,6 +24,8 @@ public record PaginatedResponse<T>(
 
 public record ProcessoListaItem(
     string NumeroProcesso,
+    string Status,
+    string? Motivo,
     string Tribunal,
     string Grau,
     string RamoJustica,
@@ -34,6 +40,8 @@ public record ProcessoListaItem(
 
 public record ProcessoDetalheResponse(
     string NumeroProcesso,
+    string Status,
+    string? Motivo,
     string IdDatajud,
     string Tribunal,
     string Grau,

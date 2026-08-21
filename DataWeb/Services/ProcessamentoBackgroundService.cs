@@ -94,8 +94,8 @@ public class ProcessamentoBackgroundService : BackgroundService
             using var stream = new MemoryStream(arquivoBytes);
             
             // Processar
-            var respostasJson = await consultaUseCase.ConsultarJsonAsync(stream, paralelismo: 20, ct);
-            var linhas = parser.ExtrairLinhas(respostasJson);
+            var respostas = await consultaUseCase.ConsultarJsonAsync(stream, paralelismo: 20, ct);
+            var linhas = parser.ExtrairLinhas(respostas);
             var excelBytes = exporter.GerarExcel(linhas);
 
             // Salvar resultado
@@ -108,11 +108,14 @@ public class ProcessamentoBackgroundService : BackgroundService
             await File.WriteAllBytesAsync(caminhoResultado, excelBytes, ct);
 
             // Marcar como concluído
-            await jobService.MarcarJobComoConcluidoAsync(jobId, caminhoResultado, linhas.Count);
+            await jobService.MarcarJobComoConcluidoAsync(jobId, caminhoResultado, linhas.Count(l => l.FoiEncontrado));
             jobService.RemoverArquivoTemporario(jobId);
 
-            _logger.LogInformation("Job {JobId} concluído com sucesso. {Total} processos processados", 
-                jobId, linhas.Count);
+            _logger.LogInformation(
+                "Job {JobId} concluído. {Encontrados} encontrados, {Pendencias} pendências",
+                jobId,
+                linhas.Count(l => l.FoiEncontrado),
+                linhas.Count(l => !l.FoiEncontrado));
         }
         catch (Exception ex)
         {

@@ -1,4 +1,7 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using DataWeb.Domain.Entities;
+using DataWeb.Utils;
 
 namespace DataWeb.Domain;
 
@@ -6,6 +9,8 @@ public class LinhaProcesso
 {
     public string ID_Datajud { get; set; } = "";
     public string NumeroProcesso { get; set; } = "";
+    public string Status { get; set; } = DataJudProcessoStatus.Encontrado;
+    public string Motivo { get; set; } = "";
     public string Tribunal { get; set; } = "";
     public string Grau { get; set; } = "";
     public string NivelSigilo { get; set; } = "";
@@ -29,7 +34,23 @@ public class LinhaProcesso
     public string EhMaisRecente { get; set; } = "N/A";
     public int OrdemMovimentacao { get; set; } = 0;
 
+    [JsonIgnore]
+    public bool FoiEncontrado =>
+        string.IsNullOrWhiteSpace(Status)
+        || string.Equals(Status, DataJudProcessoStatus.Encontrado, StringComparison.OrdinalIgnoreCase);
+
     public LinhaProcesso Clone() => (LinhaProcesso)MemberwiseClone();
+
+    public static LinhaProcesso Placeholder(string cnj, string status, string motivo)
+    {
+        var digits = CnjFormat.SomenteDigitos(cnj);
+        return new LinhaProcesso
+        {
+            NumeroProcesso = digits.Length == 20 ? digits : cnj.Trim(),
+            Status = status,
+            Motivo = motivo
+        };
+    }
 
     public static LinhaProcesso From(JsonElement proc, JsonElement src)
     {
@@ -40,6 +61,7 @@ public class LinhaProcesso
         {
             ID_Datajud = proc.TryGetProperty("_id", out var id) ? id.GetString() ?? "" : "",
             NumeroProcesso = GetStr(src, "numeroProcesso"),
+            Status = DataJudProcessoStatus.Encontrado,
             Tribunal = GetStr(src, "tribunal"),
             Grau = GetStr(src, "grau"),
             NivelSigilo = GetNum(src, "nivelSigilo"),

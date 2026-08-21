@@ -2,6 +2,18 @@ namespace DataWeb.Utils;
 
 public static class CnjFormat
 {
+    public static string SomenteDigitos(string numero)
+    {
+        if (string.IsNullOrWhiteSpace(numero)) return string.Empty;
+        return new string(numero.Where(char.IsDigit).ToArray());
+    }
+
+    public static string ChaveCnj(string numero)
+    {
+        var digits = SomenteDigitos(numero);
+        return digits.Length == 20 ? digits : (numero ?? string.Empty).Trim();
+    }
+
     public static string FormatarNumero(string numero)
     {
         if (string.IsNullOrWhiteSpace(numero)) return string.Empty;
@@ -11,8 +23,8 @@ public static class CnjFormat
 
     public static string FormatarComMascara(string numero)
     {
-        var digits = FormatarNumero(numero);
-        if (digits.Length != 20) return numero.Trim();
+        var digits = SomenteDigitos(numero);
+        if (digits.Length != 20) return string.IsNullOrWhiteSpace(numero) ? string.Empty : numero.Trim();
 
         return $"{digits[..7]}-{digits[7..9]}.{digits[9..13]}.{digits[13]}.{digits[14..16]}.{digits[16..20]}";
     }

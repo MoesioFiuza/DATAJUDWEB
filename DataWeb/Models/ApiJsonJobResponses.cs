@@ -9,6 +9,7 @@ public record ApiJsonJobCreatedResponse(
 /// <summary>
 /// Status do job JSON. Progresso = percentual de CNJs consultados (0–100).
 /// TotalLinhas só é preenchido quando status = concluido.
+/// TotalEncontrados / TotalNaoEncontrados / TotalErros só quando concluido.
 /// </summary>
 public record ApiJsonJobStatusResponse(
     string JobId,
@@ -20,7 +21,10 @@ public record ApiJsonJobStatusResponse(
     DateTime CreatedAt,
     DateTime? StartedAt,
     DateTime? CompletedAt,
-    string? Erro);
+    string? Erro,
+    int TotalEncontrados = 0,
+    int TotalNaoEncontrados = 0,
+    int TotalErros = 0);
 
 public record ServiceStatusResponse(
     string Status,

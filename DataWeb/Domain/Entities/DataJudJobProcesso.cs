@@ -56,4 +56,5 @@ public static class DataJudProcessoStatus
     public const string Encontrado = "encontrado";
     public const string NaoEncontrado = "nao_encontrado";
     public const string Erro = "erro";
+    public const string Invalido = "invalido";
 }

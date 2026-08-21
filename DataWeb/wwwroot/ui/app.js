@@ -54,7 +54,7 @@ async function generate(){
 
     const url = URL.createObjectURL(blob);
     if(dl){ dl.href = url; dl.classList.remove('hidden'); }
-    if(st) st.textContent = 'Pronto! Seu Excel consolidado está disponível para download.';
+    if(st) st.textContent = 'Pronto! Se algum CNJ não retornou dados, veja a aba "Não encontrados" no Excel.';
   }catch(err){
     setProgress(progress, 100);
     if(st) st.textContent = '';

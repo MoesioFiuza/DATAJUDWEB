@@ -1,4 +1,5 @@
 using DataWeb.Domain;
+using DataWeb.Domain.Entities;
 using DataWeb.Utils;
 
 namespace DataWeb.Services;
@@ -8,18 +9,19 @@ public static class JobResultadoAgrupador
     public static IReadOnlyList<ProcessoAgrupado> Agrupar(IEnumerable<LinhaProcesso> linhas)
     {
         return linhas
-            .GroupBy(l => CnjFormat.FormatarNumero(l.NumeroProcesso))
+            .GroupBy(l => CnjFormat.ChaveCnj(l.NumeroProcesso))
             .Where(g => !string.IsNullOrEmpty(g.Key))
             .Select(g => new ProcessoAgrupado(g.Key, g.ToList()))
-            .OrderBy(p => p.NumeroProcessoDigits)
+            .OrderBy(p => p.FoiEncontrado ? 0 : 1)
+            .ThenBy(p => p.NumeroProcessoDigits)
             .ToList();
     }
 
     public static ProcessoAgrupado? BuscarPorCnj(IReadOnlyList<ProcessoAgrupado> processos, string cnj)
     {
-        var digits = CnjFormat.FormatarNumero(cnj);
-        if (string.IsNullOrEmpty(digits)) return null;
-        return processos.FirstOrDefault(p => p.NumeroProcessoDigits == digits);
+        var chave = CnjFormat.ChaveCnj(cnj);
+        if (string.IsNullOrEmpty(chave)) return null;
+        return processos.FirstOrDefault(p => p.NumeroProcessoDigits == chave);
     }
 }
 
@@ -34,6 +36,12 @@ public sealed class ProcessoAgrupado
         NumeroProcessoDigits = numeroProcessoDigits;
         Base = linhas.OrderBy(l => l.OrdemMovimentacao).First();
 
+        if (!Base.FoiEncontrado)
+        {
+            Movimentacoes = Array.Empty<LinhaProcesso>();
+            return;
+        }
+
         var comMovimento = linhas
             .Where(l => l.OrdemMovimentacao > 0)
             .OrderBy(l => l.OrdemMovimentacao)
@@ -41,6 +49,12 @@ public sealed class ProcessoAgrupado
 
         Movimentacoes = comMovimento.Count > 0 ? comMovimento : linhas.Take(1).ToList();
     }
+
+    public bool FoiEncontrado => Base.FoiEncontrado;
+    public string Status => string.IsNullOrWhiteSpace(Base.Status)
+        ? DataJudProcessoStatus.Encontrado
+        : Base.Status;
+    public string? Motivo => string.IsNullOrWhiteSpace(Base.Motivo) ? null : Base.Motivo;
 
     public string NumeroProcessoFormatado => CnjFormat.FormatarComMascara(NumeroProcessoDigits);
 

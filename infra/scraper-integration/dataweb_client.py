@@ -165,16 +165,32 @@ def _mesclar_excels(partes: list[bytes]) -> bytes:
         ) from exc
 
     wb_dest = load_workbook(BytesIO(partes[0]))
-    ws_dest = wb_dest.active
-    if ws_dest is None:
-        raise DataWebError("Planilha DataWeb sem aba ativa.")
+    abas = (
+        "Dados Completos",
+        "Não encontrados",
+        "Resumo Processos",
+        "Movimentações Recentes",
+        "Análise Movimentações",
+    )
 
     for blob in partes[1:]:
         wb_src = load_workbook(BytesIO(blob), read_only=True, data_only=True)
-        ws_src = wb_src.active
-        if ws_src is not None:
+        for nome in abas:
+            if nome not in wb_src.sheetnames:
+                continue
+            if nome not in wb_dest.sheetnames:
+                continue
+            ws_dest = wb_dest[nome]
+            ws_src = wb_src[nome]
             for row in ws_src.iter_rows(min_row=2, values_only=True):
-                if row and any(cell is not None and str(cell).strip() for cell in row):
+                if not row or not any(cell is not None and str(cell).strip() for cell in row):
+                    continue
+                primeira = str(row[0]).strip() if row[0] is not None else ""
+                if primeira.startswith("("):
+                    continue
+                if nome == "Não encontrados":
+                    ws_dest.append(list(row[:3]))
+                else:
                     ws_dest.append(list(row))
         wb_src.close()
 

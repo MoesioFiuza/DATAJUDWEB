@@ -13,28 +13,20 @@ public class ConsultaUseCase : IConsultaUseCase
         _reader = reader; _client = client;
     }
 
-    public async Task<IReadOnlyList<string>> ConsultarJsonAsync(Stream xlsxStream, int paralelismo, CancellationToken ct)
+    public async Task<IReadOnlyList<RespostaCnj>> ConsultarJsonAsync(Stream xlsxStream, int paralelismo, CancellationToken ct)
     {
         var cnjs = _reader.LerCnjs(xlsxStream);
         return await ConsultarPorCnjsAsync(cnjs, paralelismo, ct);
     }
 
-    public async Task<IReadOnlyList<string>> ConsultarPorCnjsAsync(
+    public async Task<IReadOnlyList<RespostaCnj>> ConsultarPorCnjsAsync(
         IEnumerable<string> cnjs,
         int paralelismo,
         CancellationToken ct,
         IProgress<int>? progressoCnjs = null)
     {
         var porEstado = new Dictionary<string, List<string>>(StringComparer.Ordinal);
-        foreach (var cnj in cnjs)
-        {
-            if (!CnjParse.TryObterCodigo(cnj, out var codigo)) continue;
-            if (!CnjMaps.CodigoEstado.TryGetValue(codigo, out var estado)) continue;
-
-            if (!porEstado.TryGetValue(estado, out var lista))
-                porEstado[estado] = lista = new List<string>();
-            lista.Add(cnj);
-        }
+        var naoConsultados = new List<RespostaCnj>();
 
         var concluidos = 0;
         void ReportarConclusao()
@@ -43,9 +35,36 @@ public class ConsultaUseCase : IConsultaUseCase
             progressoCnjs?.Report(atual);
         }
 
+        foreach (var cnj in cnjs)
+        {
+            if (!CnjParse.TryObterCodigo(cnj, out var codigo))
+            {
+                naoConsultados.Add(RespostaCnj.Invalido(cnj, "CNJ em formato inválido"));
+                ReportarConclusao();
+                continue;
+            }
+
+            if (!CnjMaps.CodigoEstado.TryGetValue(codigo, out var estado))
+            {
+                naoConsultados.Add(RespostaCnj.Invalido(cnj, $"Tribunal {codigo} não mapeado"));
+                ReportarConclusao();
+                continue;
+            }
+
+            if (!porEstado.TryGetValue(estado, out var lista))
+                porEstado[estado] = lista = new List<string>();
+            lista.Add(cnj);
+        }
+
+        if (porEstado.Count == 0)
+            return naoConsultados;
+
         var tasks = porEstado.Select(kv =>
             _client.ConsultarPorEstadoAsync(kv.Key, kv.Value, paralelismo, ct, ReportarConclusao));
         var respostasPorEstado = await Task.WhenAll(tasks);
-        return respostasPorEstado.SelectMany(x => x).ToList();
+
+        return naoConsultados
+            .Concat(respostasPorEstado.SelectMany(x => x))
+            .ToList();
     }
 }
