@@ -1,0 +1,195 @@
+using System.Text.Json;
+using DataWeb.Domain.Entities;
+using DataWeb.Infrastructure.Repositories;
+using DataWeb.Models;
+
+namespace DataWeb.Services;
+
+public class ApiJsonJobService : IApiJsonJobService
+{
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = false
+    };
+
+    private readonly IJobRepository _repository;
+    private readonly ILogger<ApiJsonJobService> _logger;
+
+    public ApiJsonJobService(IJobRepository repository, ILogger<ApiJsonJobService> logger)
+    {
+        _repository = repository;
+        _logger = logger;
+    }
+
+    public async Task<ApiJsonJobCreatedResponse> CriarJobAsync(IReadOnlyList<string> cnjs, CancellationToken ct = default)
+    {
+        var job = new DataJudJob
+        {
+            Id = Guid.NewGuid().ToString(),
+            UserId = 0,
+            FileName = "api-json",
+            OriginalFileSize = 0,
+            JobKind = DataJudJobKind.ApiJson,
+            InputCnjsJson = JsonSerializer.Serialize(cnjs, JsonOptions),
+            Status = DataJudJobStatus.Pendente,
+            TotalProcessos = cnjs.Count,
+            ProcessosProcessados = 0,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await _repository.CreateAsync(job);
+
+        _logger.LogInformation("Job JSON criado: {JobId} com {Count} CNJs", job.Id, cnjs.Count);
+
+        return new ApiJsonJobCreatedResponse(
+            job.Id,
+            job.Status,
+            cnjs.Count,
+            "Job criado e aguardando processamento");
+    }
+
+    public async Task<ApiJsonJobStatusResponse?> ObterStatusAsync(string jobId, CancellationToken ct = default)
+    {
+        var job = await _repository.GetByIdAsync(jobId);
+        if (job == null || job.JobKind != DataJudJobKind.ApiJson) return null;
+
+        return MapStatus(job);
+    }
+
+    public async Task<ProcessarCnjsJsonResponse?> ObterResultadoAsync(string jobId, CancellationToken ct = default)
+    {
+        var job = await _repository.GetByIdAsync(jobId);
+        if (job == null || job.JobKind != DataJudJobKind.ApiJson) return null;
+        if (job.Status != DataJudJobStatus.Concluido || string.IsNullOrWhiteSpace(job.ResultJson)) return null;
+
+        return JsonSerializer.Deserialize<ProcessarCnjsJsonResponse>(job.ResultJson, JsonOptions);
+    }
+
+    public async Task<bool> TentarMarcarComoProcessandoAsync(string jobId, CancellationToken ct = default)
+    {
+        var job = await _repository.GetByIdAsync(jobId);
+        if (job == null || job.JobKind != DataJudJobKind.ApiJson) return false;
+        if (job.Status != DataJudJobStatus.Pendente) return false;
+
+        job.Status = DataJudJobStatus.Processando;
+        job.StartedAt = DateTime.UtcNow;
+        await _repository.UpdateAsync(job);
+        return true;
+    }
+
+    public async Task MarcarComoConcluidoAsync(string jobId, ProcessarCnjsJsonResponse resultado, CancellationToken ct = default)
+    {
+        var job = await _repository.GetByIdAsync(jobId);
+        if (job == null) return;
+
+        job.Status = DataJudJobStatus.Concluido;
+        job.CompletedAt = DateTime.UtcNow;
+        job.ResultJson = JsonSerializer.Serialize(resultado, JsonOptions);
+        job.TotalProcessos = resultado.TotalCnjsEnviados;
+        job.ProcessosProcessados = resultado.TotalCnjsEnviados;
+
+        await _repository.UpdateAsync(job);
+        _logger.LogInformation(
+            "Job JSON {JobId} concluído: {Cnjs} CNJs, {Linhas} linhas",
+            jobId,
+            resultado.TotalCnjsEnviados,
+            resultado.TotalLinhas);
+    }
+
+    public async Task AtualizarProgressoAsync(string jobId, int cnjsProcessados, CancellationToken ct = default)
+    {
+        var job = await _repository.GetByIdAsync(jobId);
+        if (job == null || job.JobKind != DataJudJobKind.ApiJson) return;
+        if (job.Status != DataJudJobStatus.Processando) return;
+        if (cnjsProcessados <= job.ProcessosProcessados) return;
+
+        job.ProcessosProcessados = cnjsProcessados;
+        await _repository.UpdateAsync(job);
+    }
+
+    public async Task MarcarComoErroAsync(string jobId, string erro, CancellationToken ct = default)
+    {
+        var job = await _repository.GetByIdAsync(jobId);
+        if (job == null) return;
+
+        job.Status = DataJudJobStatus.Erro;
+        job.ErrorMessage = erro;
+        job.CompletedAt = DateTime.UtcNow;
+        await _repository.UpdateAsync(job);
+
+        _logger.LogError("Job JSON {JobId} falhou: {Erro}", jobId, erro);
+    }
+
+    public async Task<IReadOnlyList<string>> ObterCnjsDoJobAsync(string jobId, CancellationToken ct = default)
+    {
+        var job = await _repository.GetByIdAsync(jobId);
+        if (job == null || string.IsNullOrWhiteSpace(job.InputCnjsJson))
+            return Array.Empty<string>();
+
+        return JsonSerializer.Deserialize<List<string>>(job.InputCnjsJson, JsonOptions) ?? [];
+    }
+
+    private ApiJsonJobStatusResponse MapStatus(DataJudJob job)
+    {
+        var totalLinhas = 0;
+        var totalEncontrados = 0;
+        var totalNaoEncontrados = 0;
+        var totalErros = 0;
+        if (job.Status == DataJudJobStatus.Concluido && !string.IsNullOrWhiteSpace(job.ResultJson))
+        {
+            try
+            {
+                var resultado = JsonSerializer.Deserialize<ProcessarCnjsJsonResponse>(job.ResultJson, JsonOptions);
+                if (resultado is not null)
+                {
+                    totalLinhas = resultado.TotalLinhas;
+                    totalEncontrados = resultado.TotalEncontrados;
+                    totalNaoEncontrados = resultado.TotalNaoEncontrados;
+                    totalErros = resultado.TotalErros;
+
+                    if (totalEncontrados == 0 && totalNaoEncontrados == 0 && totalErros == 0
+                        && resultado.Processos.Count > 0)
+                    {
+                        var recalculo = ProcessarCnjsJsonResponse.Criar(
+                            resultado.TotalCnjsEnviados,
+                            resultado.Processos.ToList());
+                        totalLinhas = recalculo.TotalLinhas;
+                        totalEncontrados = recalculo.TotalEncontrados;
+                        totalNaoEncontrados = recalculo.TotalNaoEncontrados;
+                        totalErros = recalculo.TotalErros;
+                    }
+                }
+            }
+            catch
+            {
+                // ignora JSON inválido no status
+            }
+        }
+
+        var progresso = job.Status switch
+        {
+            DataJudJobStatus.Concluido => 100,
+            DataJudJobStatus.Pendente => 0,
+            _ when job.TotalProcessos > 0 => Math.Min(
+                100,
+                (int)Math.Round((double)job.ProcessosProcessados / job.TotalProcessos * 100)),
+            _ => 0
+        };
+
+        return new ApiJsonJobStatusResponse(
+            job.Id,
+            job.Status,
+            job.TotalProcessos,
+            job.ProcessosProcessados,
+            totalLinhas,
+            progresso,
+            job.CreatedAt,
+            job.StartedAt,
+            job.CompletedAt,
+            job.ErrorMessage,
+            totalEncontrados,
+            totalNaoEncontrados,
+            totalErros);
+    }
+}

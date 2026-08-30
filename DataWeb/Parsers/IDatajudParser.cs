@@ -4,5 +4,5 @@ namespace DataWeb.Parsers;
 
 public interface IDatajudParser
 {
-    List<LinhaProcesso> ExtrairLinhas(IEnumerable<string> respostasJson);
+    List<LinhaProcesso> ExtrairLinhas(IEnumerable<RespostaCnj> respostas);
 }

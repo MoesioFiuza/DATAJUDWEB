@@ -17,7 +17,7 @@ async function postExcel(file, onProgress){
   const form = new FormData(); form.append('file', file);
   const xhr = new XMLHttpRequest();
   return await new Promise((resolve, reject)=>{
-    xhr.open('POST','/upload-xlsx-excel', true);
+    xhr.open('POST', '../upload-xlsx-excel', true);
     xhr.responseType = 'blob';
     xhr.upload.onprogress = e=>{
       if(e.lengthComputable && onProgress){
@@ -54,7 +54,7 @@ async function generate(){
 
     const url = URL.createObjectURL(blob);
     if(dl){ dl.href = url; dl.classList.remove('hidden'); }
-    if(st) st.textContent = 'Pronto! Seu Excel consolidado está disponível para download.';
+    if(st) st.textContent = 'Pronto! Se algum CNJ não retornou dados, veja a aba "Não encontrados" no Excel.';
   }catch(err){
     setProgress(progress, 100);
     if(st) st.textContent = '';

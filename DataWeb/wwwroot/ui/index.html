@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>DataWeb — XLSX → Excel</title>
-  <link rel="stylesheet" href="/ui/styles.css" />
+  <link rel="stylesheet" href="styles.css" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 </head>
@@ -20,7 +20,7 @@
       </div>
       <div class="actions">
         <button id="theme-toggle" class="btn ghost" aria-label="Alternar tema">Tema</button>
-        <a class="btn link" href="/swagger" target="_blank" rel="noreferrer">API</a>
+        <a class="btn link" href="../health" target="_blank" rel="noreferrer">Status</a>
       </div>
     </header>
 
@@ -60,18 +60,17 @@
         <ul class="tips">
           <li>Formatação dos CNJs é feita automaticamente (20 dígitos).</li>
           <li>As consultas são feitas por estado, em paralelo, com chave ApiKey única.</li>
-          <li>O Excel gerado inclui abas: Dados Completos, Movimentações Recentes, Resumo e Análise.</li>
+          <li>O Excel gerado inclui abas: Dados Completos, Não encontrados, Movimentações Recentes, Resumo e Análise.</li>
         </ul>
       </section>
     </main>
 
     <footer class="footer">
-      <span class="muted">OpenAPI: <a href="/openapi/v1.json" target="_blank" rel="noreferrer">/openapi/v1.json</a></span>
-      <span class="muted">UI da API: <a href="/swagger" target="_blank" rel="noreferrer">/swagger</a></span>
+      <span class="muted">Health: <a href="../health" target="_blank" rel="noreferrer">/health</a></span>
     </footer>
   </div>
 
   <div id="toast" class="toast hidden"></div>
-  <script src="/ui/app.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
