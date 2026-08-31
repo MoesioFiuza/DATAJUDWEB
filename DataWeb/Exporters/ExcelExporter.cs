@@ -158,10 +158,10 @@ public class ExcelExporter : IExcelExporter
         foreach (var l in ls)
         {
             ws.Cell(r, 1).Value = l.ID_Datajud;
-            ws.Cell(r, 2).Value = l.NumeroProcesso;
+            ws.Cell(r, 2).Value = CnjFormat.FormatarComMascara(l.NumeroProcesso);
             ws.Cell(r, 3).Value = l.Tribunal;
-            ws.Cell(r, 4).Value = l.Grau;
-            ws.Cell(r, 5).Value = l.NivelSigilo;
+            ws.Cell(r, 4).Value = CnjFormat.ObterGrauTratado(l.Grau);
+            ws.Cell(r, 5).Value = CnjFormat.ObterNivelSigiloTratado(l.NivelSigilo);
             ws.Cell(r, 6).Value = l.CClasse_Codigo;
             ws.Cell(r, 7).Value = l.CClasse_Nome;
             ws.Cell(r, 8).Value = l.SSistema_Codigo;
@@ -205,7 +205,7 @@ public class ExcelExporter : IExcelExporter
                     Motivo = primeiro.Motivo,
                     Id = g.Select(x => x.ID_Datajud).FirstOrDefault() ?? "",
                     Tribunal = g.Select(x => x.Tribunal).FirstOrDefault() ?? "",
-                    Grau = g.Select(x => x.Grau).FirstOrDefault() ?? "",
+                    Grau = CnjFormat.ObterGrauTratado(g.Select(x => x.Grau).FirstOrDefault() ?? ""),
                     Classe = g.Select(x => x.CClasse_Nome).FirstOrDefault() ?? "",
                     Sistema = g.Select(x => x.SSistema_Nome).FirstOrDefault() ?? "",
                     Formato = g.Select(x => x.FFormato_Nome).FirstOrDefault() ?? "",

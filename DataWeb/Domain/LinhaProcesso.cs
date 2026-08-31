@@ -71,7 +71,7 @@ public class LinhaProcesso
             SSistema_Nome = src.TryGetProperty("sistema", out var s2) ? GetStr(s2, "nome") : "",
             FFormato_Codigo = src.TryGetProperty("formato", out var f1) ? GetNum(f1, "codigo") : "",
             FFormato_Nome = src.TryGetProperty("formato", out var f2) ? GetStr(f2, "nome") : "",
-            DataAjuizamento = FormatarData(GetStr(src, "dataAjuizamento")),
+            DataAjuizamento = CnjFormat.FormatarData(GetStr(src, "dataAjuizamento")),
             Orgao_Codigo = src.TryGetProperty("orgaoJulgador", out var o1) ? GetNum(o1, "codigo") : "",
             Orgao_Nome = src.TryGetProperty("orgaoJulgador", out var o2) ? GetStr(o2, "nome") : "",
             Orgao_Municipio_IBGE = src.TryGetProperty("orgaoJulgador", out var o3) ? GetNum(o3, "codigoMunicipioIBGE") : "",
@@ -85,7 +85,7 @@ public class LinhaProcesso
         string GetStr(JsonElement e, string p) => e.TryGetProperty(p, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? "" : "";
         string GetNum(JsonElement e, string p) => e.TryGetProperty(p, out var v) && v.ValueKind == JsonValueKind.Number ? v.ToString() : GetStr(e, p);
 
-        DataHoraMovimentacao = FormatarData(GetStr(mov, "dataHora"));
+        DataHoraMovimentacao = CnjFormat.FormatarData(GetStr(mov, "dataHora"));
         Movimento_Nome = GetStr(mov, "nome");
         Movimento_Codigo = GetNum(mov, "codigo");
 
@@ -141,28 +141,22 @@ public class LinhaProcesso
 
     private static string ExtrairComplementos(JsonElement mov)
     {
-        if (!mov.TryGetProperty("complementosTabelados", out var arr) || arr.ValueKind != JsonValueKind.Array) return "";
+        if (!mov.TryGetProperty("complementosTabelados", out var arr) || arr.ValueKind != JsonValueKind.Array)
+            return "";
+
         var itens = new List<string>();
         foreach (var c in arr.EnumerateArray())
         {
-            var cod = c.TryGetProperty("codigo", out var cc) && cc.ValueKind == JsonValueKind.Number ? cc.ToString() : (c.TryGetProperty("codigo", out var cc2) ? cc2.GetString() ?? "" : "");
             var nome = c.TryGetProperty("nome", out var nn) ? (nn.GetString() ?? "") : "";
             var desc = c.TryGetProperty("descricao", out var dd) ? (dd.GetString() ?? "") : "";
-            var val = c.TryGetProperty("valor", out var vv) ? (vv.ToString()) : "";
-            itens.Add($"{cod} - {nome} ({desc}: {val})");
+            var val = "";
+            if (c.TryGetProperty("valor", out var vv))
+                val = vv.ValueKind is JsonValueKind.Number or JsonValueKind.String ? vv.ToString() : "";
+
+            var formatado = CnjFormat.FormatarComplemento(desc, nome, val);
+            if (!string.IsNullOrWhiteSpace(formatado))
+                itens.Add(formatado);
         }
         return string.Join("; ", itens);
-    }
-
-    private static string FormatarData(string s)
-    {
-        if (string.IsNullOrWhiteSpace(s)) return "";
-        try
-        {
-            if (DateTimeOffset.TryParse(s, out var dto))
-                return dto.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss");
-            return s;
-        }
-        catch { return s; }
     }
 }
